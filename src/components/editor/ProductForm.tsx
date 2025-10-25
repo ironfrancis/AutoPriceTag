@@ -39,7 +39,8 @@ export default function ProductForm({
   };
 
   const handleSellingPointChange = (index: number, value: string) => {
-    const newSellingPoints = [...(formData.sellingPoints || [])];
+    const currentSellingPoints = formData.sellingPoints || [];
+    const newSellingPoints = [...currentSellingPoints];
     newSellingPoints[index] = value;
     setFormData(prev => ({
       ...prev,
