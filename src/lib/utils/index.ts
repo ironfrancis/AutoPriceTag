@@ -56,6 +56,12 @@ export function validateProductData(data: Partial<any>): string[] {
 
 // 下载文件
 export function downloadFile(data: Blob, filename: string): void {
+  // 检查是否在浏览器环境中
+  if (typeof window === 'undefined') {
+    console.warn('downloadFile 只能在浏览器环境中使用');
+    return;
+  }
+  
   const url = URL.createObjectURL(data);
   const link = document.createElement('a');
   link.href = url;
@@ -69,6 +75,12 @@ export function downloadFile(data: Blob, filename: string): void {
 // 压缩图片
 export function compressImage(file: File, maxWidth: number = 800, quality: number = 0.8): Promise<string> {
   return new Promise((resolve, reject) => {
+    // 检查是否在浏览器环境中
+    if (typeof window === 'undefined') {
+      reject(new Error('compressImage 只能在浏览器环境中使用'));
+      return;
+    }
+    
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
@@ -146,9 +158,15 @@ export function isImageFile(filename: string): boolean {
 
 // 文本宽度计算（Canvas measureText）
 export function measureTextWidth(text: string, fontSize: number, fontFamily: string = 'Noto Sans SC'): number {
+  // 检查是否在浏览器环境中
+  if (typeof window === 'undefined') {
+    // 服务端渲染时返回估算值
+    return text.length * fontSize * 0.6;
+  }
+  
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  if (!ctx) return 0;
+  if (!ctx) return text.length * fontSize * 0.6;
   
   ctx.font = `${fontSize}px "${fontFamily}", sans-serif`;
   return ctx.measureText(text).width;
@@ -186,6 +204,17 @@ export function wrapText(
   fontSize: number,
   fontFamily: string = 'Noto Sans SC'
 ): { lines: string[]; totalHeight: number } {
+  // 检查是否在浏览器环境中
+  if (typeof window === 'undefined') {
+    // 服务端渲染时使用简单换行
+    const estimatedCharsPerLine = Math.floor(maxWidth / (fontSize * 0.6));
+    const lines = [];
+    for (let i = 0; i < text.length; i += estimatedCharsPerLine) {
+      lines.push(text.slice(i, i + estimatedCharsPerLine));
+    }
+    return { lines: lines.slice(0, 3), totalHeight: Math.min(lines.length, 3) * fontSize * 1.2 };
+  }
+  
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) return { lines: [text], totalHeight: fontSize * 1.2 };
