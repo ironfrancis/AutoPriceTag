@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+:root {
+  /* AutoPriceTag 品牌色彩系统 */
+  --primary-blue: #1E88E5;
+  --secondary-orange: #FF9800;
+  --success-green: #4CAF50;
+  --warning-red: #F44336;
+  --info-blue: #2196F3;
+  --neutral-gray: #F5F7FA;
+  --text-primary: #212121;
+  --text-secondary: #757575;
+  --text-disabled: #BDBDBD;
+  --background: #ffffff;
+  --foreground: #171717;
+  --border: #E0E0E0;
+}
+
+@theme inline {
+  --color-primary: var(--primary-blue);
+  --color-secondary: var(--secondary-orange);
+  --color-success: var(--success-green);
+  --color-warning: var(--warning-red);
+  --color-info: var(--info-blue);
+  --color-neutral: var(--neutral-gray);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 移除暗黑模式支持，保持一致的白天视觉体验 */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neutral-gray);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-disabled);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* 选择文本样式 */
+::selection {
+  background: var(--primary-blue);
+  color: white;
+}
+
+/* 焦点样式 */
+:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+/* 按钮基础样式 */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500;
+  @apply disabled:pointer-events-none disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.btn-secondary {
+  @apply bg-orange-500 text-white hover:bg-orange-600;
+}
+
+.btn-outline {
+  @apply border border-gray-300 bg-white hover:bg-gray-50 hover:text-gray-900;
+}
+
+/* 输入框样式 */
+.input {
+  @apply flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm;
+  @apply placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2;
+  @apply focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* 卡片样式 */
+.card {
+  @apply rounded-lg border border-gray-200 bg-white text-gray-900 shadow-sm;
+}
+
+/* 工具提示样式 */
+.tooltip {
+  @apply z-50 overflow-hidden rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900;
+  @apply shadow-md;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
