@@ -56,7 +56,8 @@ export function calculateSimpleLayout(
   labelWidth: number,
   labelHeight: number,
   productData: ProductData,
-  config: SimpleLayoutConfig = SIMPLE_DEFAULT_CONFIG
+  config: SimpleLayoutConfig = SIMPLE_DEFAULT_CONFIG,
+  textAreaRatio: number = 0.65 // 新增参数，允许自定义分割比例
 ): SimpleLayoutResult {
   // 转换为像素单位
   const widthPx = mmToPixels(labelWidth);
@@ -64,9 +65,9 @@ export function calculateSimpleLayout(
   const paddingPx = mmToPixels(config.padding);
   const spacingPx = mmToPixels(config.elementSpacing);
 
-  // 计算区域划分
-  const textAreaWidth = widthPx * config.textAreaRatio - paddingPx;
-  const priceAreaWidth = widthPx * (1 - config.textAreaRatio) - paddingPx;
+  // 计算区域划分（使用自定义比例）
+  const textAreaWidth = widthPx * textAreaRatio - paddingPx;
+  const priceAreaWidth = widthPx * (1 - textAreaRatio) - paddingPx;
   const priceAreaHeight = Math.min(priceAreaWidth, heightPx - paddingPx * 2); // 正方形
   
   // 计算文字区域可用高度
@@ -224,12 +225,16 @@ function layoutPriceArea(
   // 计算文本布局
   const { lines, text } = calculateTextLayout(priceText, areaWidth, fontSize);
   
+  // 计算垂直居中位置
+  const textHeight = fontSize * lines * config.lineHeight;
+  const verticalCenter = startY + (areaHeight - textHeight) / 2;
+  
   return {
     id: 'product_price',
     x: startX,
-    y: startY,
+    y: verticalCenter,
     width: areaWidth,
-    height: areaHeight,
+    height: textHeight,
     fontSize,
     align: 'center',
     lines,

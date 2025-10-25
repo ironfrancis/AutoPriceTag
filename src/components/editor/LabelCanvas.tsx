@@ -21,6 +21,8 @@ export default function LabelCanvas({
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
   const [simpleLayoutResult, setSimpleLayoutResult] = useState<SimpleLayoutResult | null>(null);
+  const [textAreaRatio, setTextAreaRatio] = useState(0.65); // 文字区域比例
+  const [isDragging, setIsDragging] = useState(false); // 是否正在拖拽
 
   useEffect(() => {
     // 确保只在客户端运行
@@ -56,11 +58,13 @@ export default function LabelCanvas({
     }
 
     try {
-      // 计算简洁布局
+      // 计算简洁布局（使用当前的分割比例）
       const simpleResult = calculateSimpleLayout(
         labelSize.width,
         labelSize.height,
-        productData
+        productData,
+        undefined,
+        textAreaRatio
       );
 
       setSimpleLayoutResult(simpleResult);
@@ -76,7 +80,7 @@ export default function LabelCanvas({
       console.error('Simple layout calculation failed:', error);
       setIsRendering(false);
     }
-  }, [labelSize, productData]);
+  }, [labelSize, productData, textAreaRatio]); // 添加 textAreaRatio 依赖
 
   // 当简洁布局结果变化时，重新渲染画布（但不重新计算缩放）
   useEffect(() => {
@@ -180,14 +184,31 @@ export default function LabelCanvas({
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
 
-    // 绘制区域分割线
-    const textAreaWidth = previewSize.width * 0.65;
-    ctx.strokeStyle = '#E5E7EB';
-    ctx.lineWidth = 1;
+    // 绘制区域分割线（可拖拽）
+    const textAreaWidth = previewSize.width * textAreaRatio;
+    ctx.strokeStyle = isDragging ? '#3B82F6' : '#E5E7EB'; // 拖拽时变蓝色
+    ctx.lineWidth = isDragging ? 2 : 1;
     ctx.beginPath();
     ctx.moveTo(textAreaWidth, 0);
     ctx.lineTo(textAreaWidth, previewSize.height);
     ctx.stroke();
+    
+    // 绘制拖拽手柄
+    if (isDragging) {
+      const handleY = previewSize.height / 2;
+      const handleSize = 8;
+      
+      // 绘制圆形手柄
+      ctx.fillStyle = '#3B82F6';
+      ctx.beginPath();
+      ctx.arc(textAreaWidth, handleY, handleSize, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // 绘制手柄边框
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
 
     // 渲染每个简洁元素
     simpleResult.elements.forEach(element => {
@@ -371,6 +392,51 @@ export default function LabelCanvas({
     });
   };
 
+  // 鼠标事件处理
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // 计算预览尺寸
+    const previewSize = calculatePreviewSizeByRatio(labelSize.width, labelSize.height);
+    const textAreaWidth = previewSize.width * textAreaRatio;
+    
+    // 检查是否点击在分割线附近（10像素范围内）
+    if (Math.abs(x - textAreaWidth) <= 10 && y >= 0 && y <= previewSize.height) {
+      setIsDragging(true);
+      e.preventDefault();
+    }
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    
+    // 计算预览尺寸
+    const previewSize = calculatePreviewSizeByRatio(labelSize.width, labelSize.height);
+    
+    // 计算新的比例（限制在 0.3 到 0.8 之间）
+    const newRatio = Math.max(0.3, Math.min(0.8, x / previewSize.width));
+    setTextAreaRatio(newRatio);
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+  
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
   // mm转像素
   const mmToPixels = (mm: number): number => {
     return mm * 3.7795275591;
@@ -404,12 +470,17 @@ export default function LabelCanvas({
             <div className="relative w-full h-full flex items-center justify-center">
               <canvas
                 ref={canvasRef}
-                className="border-0 rounded-lg shadow-lg bg-white"
+                className="border-0 rounded-lg shadow-lg bg-white cursor-pointer"
                 style={{ 
                   width: 'auto', 
                   height: 'auto',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  cursor: isDragging ? 'col-resize' : 'pointer'
                 }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
               />
             </div>
           ) : (
@@ -427,16 +498,19 @@ export default function LabelCanvas({
           <div className="mt-2 text-center text-caption text-gray-500 bg-white rounded px-2 py-1">
             <div className="flex items-center justify-center space-x-2">
               <span className="font-medium text-blue-600">
-                文字区: 65%
+                文字区: {Math.round(textAreaRatio * 100)}%
               </span>
               <span className="mx-1">•</span>
               <span className="text-green-600">
-                价格区: 35%
+                价格区: {Math.round((1 - textAreaRatio) * 100)}%
               </span>
               <span className="mx-1">•</span>
               <span className="text-purple-600">
                 {simpleLayoutResult.elements.length} 个元素
               </span>
+            </div>
+            <div className="mt-1 text-xs text-gray-400">
+              拖拽分割线调整比例
             </div>
           </div>
         )}
