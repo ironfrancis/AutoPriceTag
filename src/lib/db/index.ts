@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { LabelTemplate, ProductData, HistoryRecord, UserSettings, SavedLabel } from './types';
+import { LabelTemplate, ProductData, HistoryRecord, UserSettings, SavedLabel } from '../types';
 
 export class AutoPriceTagDB extends Dexie {
   templates!: Table<LabelTemplate>;
@@ -55,7 +55,7 @@ export async function getUserSettings(): Promise<UserSettings> {
 // 保存用户设置
 export async function saveUserSettings(settings: UserSettings): Promise<void> {
   try {
-    await db.settings.put({ ...settings, id: 'default' });
+    await db.settings.put({ ...settings, id: 'default' } as UserSettings & { id: string });
   } catch (error) {
     console.error('保存用户设置失败:', error);
   }

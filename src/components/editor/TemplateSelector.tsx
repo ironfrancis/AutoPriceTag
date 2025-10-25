@@ -57,14 +57,16 @@ export default function TemplateSelector({
                   opacity: element.style.opacity || 1,
                 }}
               >
-                {element.content === '{{product.name}}' ? '商品名称' :
-                 element.content === '{{product.price}}' ? '¥99.00' :
-                 element.content === '{{product.originalPrice}}' ? '¥199.00' :
-                 element.content === '{{product.discount}}' ? '5折' :
-                 element.content === '促销' ? '促销' :
-                 element.content === '{{product.sellingPoints.0}}' ? '卖点描述' :
-                 element.content === '{{product.specs}}' ? '规格参数' :
-                 element.content}
+                {typeof element.content === 'string' ? (
+                  element.content === '{{product.name}}' ? '商品名称' :
+                  element.content === '{{product.price}}' ? '¥99.00' :
+                  element.content === '{{product.originalPrice}}' ? '¥199.00' :
+                  element.content === '{{product.discount}}' ? '5折' :
+                  element.content === '促销' ? '促销' :
+                  element.content === '{{product.sellingPoints.0}}' ? '卖点描述' :
+                  element.content === '{{product.specs}}' ? '规格参数' :
+                  element.content
+                ) : '图片'}
               </div>
             );
           }

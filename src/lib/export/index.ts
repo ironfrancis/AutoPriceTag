@@ -175,9 +175,9 @@ export class ExportManager {
     let blob: Blob;
     
     if (format === 'pdf') {
-      blob = await exportCanvasAsPDF({ ...exportOptions, canvas: this.canvas });
+      blob = await exportCanvasAsPDF({ ...exportOptions, canvas: this.canvas, format });
     } else {
-      blob = await exportCanvasAsImage({ ...exportOptions, canvas: this.canvas });
+      blob = await exportCanvasAsImage({ ...exportOptions, canvas: this.canvas, format });
     }
     
     downloadFile(blob, filename);
