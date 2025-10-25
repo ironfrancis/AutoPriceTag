@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { ProductData } from '@/lib/types';
-import { calculateSmartLayout, SmartLayoutResult, LayoutElement } from '@/lib/layout/smartLayout';
-import { recommendColorScheme } from '@/lib/design/colorSystem';
-import { getBestTemplate } from '@/lib/design/templateRecommendation';
-import { defaultTemplates } from '@/lib/templates';
+import { calculateSimpleLayout, SimpleLayoutResult, LayoutElement } from '@/lib/layout/simpleLayout';
 
 interface LabelCanvasProps {
   labelSize: { width: number; height: number };
@@ -23,8 +20,7 @@ export default function LabelCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
-  const [smartLayoutResult, setSmartLayoutResult] = useState<SmartLayoutResult | null>(null);
-  const [recommendedTemplate, setRecommendedTemplate] = useState<string | null>(null);
+  const [simpleLayoutResult, setSimpleLayoutResult] = useState<SimpleLayoutResult | null>(null);
 
   useEffect(() => {
     // 确保只在客户端运行
@@ -60,36 +56,35 @@ export default function LabelCanvas({
     }
 
     try {
-      // 计算智能布局
-      const smartResult = calculateSmartLayout(
+      // 计算简洁布局
+      const simpleResult = calculateSimpleLayout(
         labelSize.width,
         labelSize.height,
         productData
       );
 
-      setSmartLayoutResult(smartResult);
-      setRecommendedTemplate(smartResult.recommendedTemplate);
+      setSimpleLayoutResult(simpleResult);
 
       // 渲染到画布
-      renderSmartLayoutToCanvas(smartResult, labelSize);
+      renderSimpleLayoutToCanvas(simpleResult, labelSize);
 
       // 只在尺寸变化时延迟结束渲染状态
       if (isSizeChange) {
         setTimeout(() => setIsRendering(false), 100);
       }
     } catch (error) {
-      console.error('Smart layout calculation failed:', error);
+      console.error('Simple layout calculation failed:', error);
       setIsRendering(false);
     }
   }, [labelSize, productData]);
 
-  // 当智能布局结果变化时，重新渲染画布（但不重新计算缩放）
+  // 当简洁布局结果变化时，重新渲染画布（但不重新计算缩放）
   useEffect(() => {
-    if (smartLayoutResult && labelSize.width > 0 && labelSize.height > 0) {
+    if (simpleLayoutResult && labelSize.width > 0 && labelSize.height > 0) {
       // 只重新渲染内容，不重新计算缩放
-      renderSmartLayoutToCanvas(smartLayoutResult, labelSize);
+      renderSimpleLayoutToCanvas(simpleLayoutResult, labelSize);
     }
-  }, [smartLayoutResult]);
+  }, [simpleLayoutResult]);
 
   // 移除窗口大小变化监听，使用固定预览尺寸
   // 不再监听窗口大小变化，保持预览区域大小稳定
@@ -152,8 +147,8 @@ export default function LabelCanvas({
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
   };
 
-  // 智能渲染到画布
-  const renderSmartLayoutToCanvas = (smartResult: SmartLayoutResult, size: { width: number; height: number }) => {
+  // 简洁渲染到画布
+  const renderSimpleLayoutToCanvas = (simpleResult: SimpleLayoutResult, size: { width: number; height: number }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -181,33 +176,34 @@ export default function LabelCanvas({
     // 清空画布
     ctx.clearRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
 
-    // 应用智能配色方案
-    const colorScheme = recommendColorScheme(
-      smartResult.colorScheme.split('-')[0] as any, // 从配色方案ID提取类别
-      'medium', // 默认价格区间
-      'normal' // 默认状态
-    );
-
-    // 设置智能背景
-    ctx.fillStyle = colorScheme.background;
+    // 设置简洁背景
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
 
-    // 渲染每个智能元素
-    smartResult.elements.forEach(element => {
-      renderSmartElementForPreview(ctx, element, previewSize, size, colorScheme);
+    // 绘制区域分割线
+    const textAreaWidth = previewSize.width * 0.65;
+    ctx.strokeStyle = '#E5E7EB';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(textAreaWidth, 0);
+    ctx.lineTo(textAreaWidth, previewSize.height);
+    ctx.stroke();
+
+    // 渲染每个简洁元素
+    simpleResult.elements.forEach(element => {
+      renderSimpleElementForPreview(ctx, element, previewSize, size);
     });
 
     // 绘制优雅的视觉分界效果
     drawElegantDivider(ctx, previewSize.width, previewSize.height);
   };
 
-  // 为预览渲染智能元素
-  const renderSmartElementForPreview = (
+  // 为预览渲染简洁元素
+  const renderSimpleElementForPreview = (
     ctx: CanvasRenderingContext2D, 
-    element: any, // SmartLayoutElement
+    element: any, // SimpleLayoutElement
     previewSize: { width: number; height: number },
-    realSize: { width: number; height: number },
-    colorScheme: any
+    realSize: { width: number; height: number }
   ) => {
     if (!element.text) return;
 
@@ -218,17 +214,13 @@ export default function LabelCanvas({
     const scaledFontSize = element.fontSize * scale;
     ctx.font = `${scaledFontSize}px "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif`;
     
-    // 根据元素重要性设置颜色
-    let textColor = colorScheme.text;
-    if (element.id === 'product_price') {
-      textColor = colorScheme.accent;
-    } else if (element.id === 'product_name') {
-      textColor = colorScheme.primary;
-    } else if (element.importance < 0.3) {
-      textColor = colorScheme.textSecondary;
+    // 根据区域设置颜色
+    if (element.area === 'price') {
+      ctx.fillStyle = '#1E88E5'; // 价格用蓝色
+    } else {
+      ctx.fillStyle = '#000000'; // 文字用黑色
     }
     
-    ctx.fillStyle = textColor;
     ctx.textBaseline = 'top';
 
     // 处理多行文本
@@ -244,10 +236,10 @@ export default function LabelCanvas({
       let x = scaledX;
       if (element.align === 'center') {
         const textWidth = ctx.measureText(line).width;
-        x = previewSize.width / 2 - textWidth / 2;
+        x = scaledX + (element.width * scale - textWidth) / 2;
       } else if (element.align === 'right') {
         const textWidth = ctx.measureText(line).width;
-        x = previewSize.width - textWidth - (element.x * scale);
+        x = scaledX + element.width * scale - textWidth;
       }
 
       // 确保文本在预览区域内
@@ -391,7 +383,7 @@ export default function LabelCanvas({
         <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg z-10">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-caption text-gray-600">正在智能分析布局...</p>
+            <p className="mt-2 text-caption text-gray-600">正在排版文字...</p>
           </div>
         </div>
       )}
@@ -430,20 +422,20 @@ export default function LabelCanvas({
           )}
         </div>
         
-        {/* 智能推荐信息 */}
-        {smartLayoutResult && (
+        {/* 布局信息 */}
+        {simpleLayoutResult && (
           <div className="mt-2 text-center text-caption text-gray-500 bg-white rounded px-2 py-1">
             <div className="flex items-center justify-center space-x-2">
               <span className="font-medium text-blue-600">
-                智能推荐: {smartLayoutResult.recommendedTemplate.replace('_template', '')}
+                文字区: 65%
               </span>
               <span className="mx-1">•</span>
               <span className="text-green-600">
-                信心度: {Math.round(smartLayoutResult.confidence * 100)}%
+                价格区: 35%
               </span>
               <span className="mx-1">•</span>
               <span className="text-purple-600">
-                风格: {smartLayoutResult.visualStyle}
+                {simpleLayoutResult.elements.length} 个元素
               </span>
             </div>
           </div>
@@ -454,8 +446,6 @@ export default function LabelCanvas({
           <span className="font-medium">
             {labelSize.width > 0 && labelSize.height > 0 ? `${labelSize.width}×${labelSize.height}mm` : '未设置'}
           </span>
-          <span className="mx-2">•</span>
-          <span>{smartLayoutResult?.elements.length || 0} 个元素</span>
         </div>
       </div>
     </div>
