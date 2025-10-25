@@ -1,11 +1,12 @@
 import Dexie, { Table } from 'dexie';
-import { LabelTemplate, ProductData, HistoryRecord, UserSettings } from './types';
+import { LabelTemplate, ProductData, HistoryRecord, UserSettings, SavedLabel } from './types';
 
 export class AutoPriceTagDB extends Dexie {
   templates!: Table<LabelTemplate>;
   products!: Table<ProductData>;
   history!: Table<HistoryRecord>;
   settings!: Table<UserSettings>;
+  savedLabels!: Table<SavedLabel>;
 
   constructor() {
     super('AutoPriceTagDB');
@@ -14,6 +15,7 @@ export class AutoPriceTagDB extends Dexie {
       products: 'id, name, price, createdAt',
       history: 'id, templateId, createdAt',
       settings: 'id, language, autoSaveEnabled',
+      savedLabels: 'id, name, createdAt, updatedAt',
     });
   }
 }
@@ -107,5 +109,69 @@ export async function cleanupHistoryRecords(): Promise<void> {
     await db.history.bulkDelete(idsToDelete);
   } catch (error) {
     console.error('清理历史记录失败:', error);
+  }
+}
+
+// 保存标签
+export async function saveLabel(label: Omit<SavedLabel, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  try {
+    const id = `label_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date();
+    await db.savedLabels.add({
+      ...label,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  } catch (error) {
+    console.error('保存标签失败:', error);
+    throw error;
+  }
+}
+
+// 获取所有保存的标签
+export async function getSavedLabels(): Promise<SavedLabel[]> {
+  try {
+    return await db.savedLabels
+      .orderBy('updatedAt')
+      .reverse()
+      .toArray();
+  } catch (error) {
+    console.error('获取保存的标签失败:', error);
+    return [];
+  }
+}
+
+// 根据ID获取标签
+export async function getSavedLabelById(id: string): Promise<SavedLabel | undefined> {
+  try {
+    return await db.savedLabels.get(id);
+  } catch (error) {
+    console.error('获取标签失败:', error);
+    return undefined;
+  }
+}
+
+// 更新标签
+export async function updateSavedLabel(id: string, updates: Partial<SavedLabel>): Promise<void> {
+  try {
+    await db.savedLabels.update(id, {
+      ...updates,
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('更新标签失败:', error);
+    throw error;
+  }
+}
+
+// 删除标签
+export async function deleteSavedLabel(id: string): Promise<void> {
+  try {
+    await db.savedLabels.delete(id);
+  } catch (error) {
+    console.error('删除标签失败:', error);
+    throw error;
   }
 }

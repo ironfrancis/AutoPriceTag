@@ -202,7 +202,7 @@ function calculateOptimalFontSize(
   let fontSize = config.maxFontSize;
   
   while (fontSize >= config.minFontSize) {
-    ctx.font = `${fontSize}px "Noto Sans SC", sans-serif`;
+    ctx.font = `${fontSize}px "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif`;
     const metrics = ctx.measureText(text);
     const textWidth = metrics.width;
     const textHeight = fontSize * config.lineHeight;
@@ -212,7 +212,7 @@ function calculateOptimalFontSize(
       return fontSize;
     }
     
-    fontSize -= 1;
+    fontSize -= 0.5; // 更精细的字体大小调整
   }
   
   return config.minFontSize;
@@ -230,7 +230,7 @@ function calculateTextLayout(
   const ctx = canvas.getContext('2d');
   if (!ctx) return { lines: 1, text };
 
-  ctx.font = `${fontSize}px "Noto Sans SC", sans-serif`;
+  ctx.font = `${fontSize}px "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif`;
   
   // 如果文本很短，不需要换行
   const textWidth = ctx.measureText(text).width;
@@ -238,12 +238,12 @@ function calculateTextLayout(
     return { lines: 1, text };
   }
 
-  // 需要换行
-  const words = text.split('');
+  // 需要换行 - 按字符分割而不是按字分割，更好地处理中文
+  const chars = text.split('');
   const lines: string[] = [];
   let currentLine = '';
 
-  for (const char of words) {
+  for (const char of chars) {
     const testLine = currentLine + char;
     const testWidth = ctx.measureText(testLine).width;
     
@@ -299,13 +299,14 @@ function getOptimalAlignment(width: number, height: number): 'left' | 'center' |
  * mm转像素
  */
 function mmToPixels(mm: number): number {
-  // 1mm ≈ 3.78px (96 DPI)
-  return mm * 3.78;
+  // 1mm ≈ 3.7795275591px (96 DPI)
+  // 使用更精确的转换系数
+  return mm * 3.7795275591;
 }
 
 /**
  * 像素转mm
  */
 export function pixelsToMm(pixels: number): number {
-  return pixels / 3.78;
+  return pixels / 3.7795275591;
 }

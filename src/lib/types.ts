@@ -1,5 +1,15 @@
 // AutoPriceTag 核心类型定义
 
+export interface SavedLabel {
+  id: string;
+  name: string;
+  labelSize: { width: number; height: number };
+  productData: ProductData;
+  thumbnail: string; // base64 缩略图
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface LabelTemplate {
   id: string;
   name: string; // 模板名称

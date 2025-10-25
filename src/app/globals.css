@@ -46,9 +46,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* 滚动条样式 */
@@ -118,6 +121,49 @@ body {
 .tooltip {
   @apply z-50 overflow-hidden rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900;
   @apply shadow-md;
+}
+
+/* 字体层次和优化 */
+.text-display {
+  @apply text-2xl font-bold tracking-tight text-gray-900;
+}
+
+.text-heading {
+  @apply text-xl font-semibold tracking-tight text-gray-900;
+}
+
+.text-subheading {
+  @apply text-lg font-medium text-gray-800;
+}
+
+.text-body {
+  @apply text-sm font-normal text-gray-700 leading-relaxed;
+}
+
+.text-caption {
+  @apply text-xs font-normal text-gray-500 leading-normal;
+}
+
+.text-label {
+  @apply text-xs font-medium text-gray-600 uppercase tracking-wide;
+}
+
+/* 优化按钮字体 */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500;
+  @apply disabled:pointer-events-none disabled:opacity-50;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* 优化输入框字体 */
+.input {
+  @apply flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm;
+  @apply placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2;
+  @apply focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 /* 动画 */
