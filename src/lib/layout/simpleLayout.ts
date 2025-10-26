@@ -36,9 +36,19 @@ const SIMPLE_DEFAULT_CONFIG: SimpleLayoutConfig = {
   padding: 2,
   elementSpacing: 1,
   minFontSize: 8,
-  maxFontSize: 24,
+  maxFontSize: 28, // 增加最大字体大小，让价格可以更大
   lineHeight: 1.2,
   textAreaRatio: 0.65, // 65% 文字区域
+};
+
+// 极简风格配置
+const MINIMALIST_CONFIG: SimpleLayoutConfig = {
+  padding: 4, // 增加内边距，营造留白
+  elementSpacing: 2, // 增加元素间距
+  minFontSize: 10,
+  maxFontSize: 32,
+  lineHeight: 1.4, // 增加行高，提升可读性
+  textAreaRatio: 0.6, // 轻微调整比例
 };
 
 // 文字区域元素定义（按优先级排序）
@@ -56,8 +66,8 @@ export function calculateSimpleLayout(
   labelWidth: number,
   labelHeight: number,
   productData: ProductData,
-  config: SimpleLayoutConfig = SIMPLE_DEFAULT_CONFIG,
-  textAreaRatio: number = 0.65 // 新增参数，允许自定义分割比例
+  config: SimpleLayoutConfig = MINIMALIST_CONFIG, // 使用极简配置作为默认
+  textAreaRatio: number = 0.6 // 使用更平衡的比例
 ): SimpleLayoutResult {
   // 转换为像素单位
   const widthPx = mmToPixels(labelWidth);
@@ -214,8 +224,8 @@ function layoutPriceArea(
   
   const priceText = `¥${productData.price.toFixed(2)}`;
   
-  // 计算价格字体大小（使用正方形区域）
-  const fontSize = calculateOptimalFontSizeForArea(
+  // 计算价格字体大小（使用更大的字体，适合价格显示）
+  const fontSize = calculatePriceFontSize(
     priceText,
     areaWidth,
     areaHeight,
@@ -241,6 +251,50 @@ function layoutPriceArea(
     text,
     area: 'price'
   };
+}
+
+/**
+ * 计算价格字体大小（专门为价格优化）
+ */
+function calculatePriceFontSize(
+  text: string,
+  maxWidth: number,
+  maxHeight: number,
+  config: SimpleLayoutConfig
+): number {
+  // 检查是否在浏览器环境中
+  if (typeof window === 'undefined') {
+    // 服务端渲染时返回估算值，价格字体更大
+    const estimatedFontSize = Math.min(
+      config.maxFontSize * 1.2, // 价格字体比普通文字大20%
+      Math.max(config.minFontSize * 1.5, maxHeight / config.lineHeight)
+    );
+    return Math.min(estimatedFontSize, maxWidth / (text.length * 0.5));
+  }
+  
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return config.minFontSize * 1.5;
+
+  // 价格字体从更大的尺寸开始
+  let fontSize = Math.min(config.maxFontSize * 1.2, maxHeight / config.lineHeight);
+  
+  while (fontSize >= config.minFontSize * 1.5) {
+    // 使用适合价格的字体
+    ctx.font = `${fontSize}px "Arial Black", "Helvetica Neue", "Arial", sans-serif`;
+    
+    // 检查单行是否适合
+    const textWidth = ctx.measureText(text).width;
+    const textHeight = fontSize * config.lineHeight;
+    
+    if (textWidth <= maxWidth && textHeight <= maxHeight) {
+      return fontSize;
+    }
+    
+    fontSize -= 1; // 价格字体调整步长更大
+  }
+  
+  return config.minFontSize * 1.5;
 }
 
 /**

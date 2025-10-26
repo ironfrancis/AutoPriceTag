@@ -14,13 +14,18 @@ export default function DocsPage() {
               </div>
               <span className="text-xl font-bold text-gray-900">AutoPriceTag</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/"
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>返回首页</span>
+            <div className="flex items-center space-x-6">
+              <Link href="/" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
+                首页
+              </Link>
+              <Link href="/editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
+                编辑器
+              </Link>
+              <Link href="/cases" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
+                案例
+              </Link>
+              <Link href="/docs" className="text-blue-600 font-medium text-sm">
+                文档
               </Link>
               <Link
                 href="/editor"
