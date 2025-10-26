@@ -55,16 +55,27 @@ npm install --production=false
 echo ""
 echo "6. 配置环境变量..."
 if [ ! -f "$PROJECT_DIR/.env.production" ]; then
-    cat > $PROJECT_DIR/.env.production << EOF
+    if [ -f "$PROJECT_DIR/.env.example" ]; then
+        echo "从 .env.example 复制配置..."
+        cp $PROJECT_DIR/.env.example $PROJECT_DIR/.env.production
+    else
+        echo "创建默认配置..."
+        cat > $PROJECT_DIR/.env.production << EOF
 # 生产环境配置
 NODE_ENV=production
 PORT=3000
 
-# Supabase 配置（如果需要云存储）
-# NEXT_PUBLIC_SUPABASE_URL=
-# NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# Supabase 配置（可选，如果需要云存储功能）
+# 访问 https://supabase.com 创建项目获取密钥
+# NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 EOF
-    echo ".env.production 文件已创建，请编辑配置"
+    fi
+    echo ""
+    echo "⚠️  重要：请编辑 .env.production 文件配置环境变量"
+    echo "运行: nano $PROJECT_DIR/.env.production"
+    echo ""
+    sleep 3
 fi
 
 echo ""

@@ -34,9 +34,19 @@ sudo chown -R $USER:$USER .
 # 4. 安装依赖
 npm install
 
-# 5. 配置环境变量（可选）
-cp .env.local.example .env.production
-nano .env.production  # 编辑配置
+# 5. 配置环境变量（重要！）
+# 复制环境变量配置模板
+cp .env.example .env.production
+
+# 编辑配置
+nano .env.production
+
+# 配置说明：
+# - NODE_ENV=production (必需)
+# - PORT=3000 (默认端口)
+# - NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY (可选)
+#   如果需要云存储功能，访问 https://supabase.com 创建项目获取密钥
+#   不配置也影响运行，数据会保存在浏览器 localStorage 中
 
 # 6. 构建项目
 npm run build
@@ -165,19 +175,35 @@ sudo systemctl restart nginx
 pm2 restart all
 ```
 
-## 环境变量说明
+## 环境变量配置
 
-在项目根目录创建 `.env.production` 文件：
+**详细配置说明请查看 `ENV_CONFIG.md`**
+
+### 快速配置
 
 ```bash
-# 生产环境配置
+# 1. 复制配置模板
+cp .env.example .env.production
+
+# 2. 编辑配置
+nano .env.production
+
+# 3. 最低配置（可以运行）
 NODE_ENV=production
 PORT=3000
 
-# Supabase 云存储（可选）
-# NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-# NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# 4. 完整配置（可选，如需云存储功能）
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# 5. 重启应用
+pm2 restart autopricetag
 ```
+
+### 重要提示
+- 不配置 Supabase 也可以运行，数据会保存在浏览器 localStorage
+- 如需跨设备同步，必须配置 Supabase
+- 详细说明请参考 `ENV_CONFIG.md` 文件
 
 ## 安全建议
 
