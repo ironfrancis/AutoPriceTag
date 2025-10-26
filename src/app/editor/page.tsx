@@ -10,6 +10,7 @@ import LabelCanvas from '@/components/editor/LabelCanvas';
 import ProductForm from '@/components/editor/ProductForm';
 import SizeInput from '@/components/editor/SizeInput';
 import SavedLabelsDialog from '@/components/editor/SavedLabelsDialog';
+import FontCustomizer, { FontConfig } from '@/components/editor/FontCustomizer';
 
 export default function EditorPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +30,51 @@ export default function EditorPage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [showSavedLabels, setShowSavedLabels] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  
+  // 字体配置状态
+  const [fontConfigs, setFontConfigs] = useState<Record<string, FontConfig>>({
+    product_name: {
+      fontSize: 16,
+      fontWeight: 500,
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#111827',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    },
+    brand: {
+      fontSize: 12,
+      fontWeight: 400,
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#6B7280',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    },
+    price: {
+      fontSize: 20,
+      fontWeight: 600,
+      fontStyle: 'normal',
+      textAlign: 'center',
+      color: '#2563eb',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    },
+    selling_points: {
+      fontSize: 10,
+      fontWeight: 400,
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#4B5563',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    },
+    specs: {
+      fontSize: 9,
+      fontWeight: 400,
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#6B7280',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }
+  });
 
   useEffect(() => {
     // 模拟加载
@@ -75,6 +121,13 @@ export default function EditorPage() {
   const handleCanvasReady = (canvas: any) => {
     setCanvasInstance(canvas);
     exportManager.setCanvas(canvas);
+  };
+
+  const handleFontConfigChange = (field: string, config: FontConfig) => {
+    setFontConfigs(prev => ({
+      ...prev,
+      [field]: config
+    }));
   };
 
   const handleLoadLabel = (label: any) => {
@@ -130,16 +183,33 @@ export default function EditorPage() {
       return;
     }
 
+    if (!productData.name.trim()) {
+      alert('请先填写商品名称');
+      return;
+    }
+
+    setIsExporting(true);
     try {
+      console.log('Starting export with:', {
+        format,
+        productName: productData.name,
+        labelSize,
+        canvasSize: { width: canvasInstance.width, height: canvasInstance.height }
+      });
+
       await exportManager.export({
         format,
         productName: productData.name || 'price_tag',
         quality: format === 'jpg' ? 0.9 : 1,
         dpi: 300,
       });
+
+      console.log('Export completed successfully');
     } catch (error) {
       console.error('导出失败:', error);
-      alert('导出失败，请重试');
+      alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -224,10 +294,11 @@ export default function EditorPage() {
               <div className="relative export-menu-container">
                 <button 
                   onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="btn btn-outline px-4 py-2 text-sm font-medium"
+                  disabled={isExporting}
+                  className="btn btn-outline px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  导出
+                  {isExporting ? '导出中...' : '导出'}
                 </button>
                 <div className={`absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${showExportMenu ? 'block' : 'hidden'}`}>
                   <button
@@ -292,6 +363,8 @@ export default function EditorPage() {
                 <LabelCanvas
                   labelSize={labelSize}
                   productData={productData}
+                  fontConfigs={fontConfigs}
+                  isExporting={isExporting}
                   onCanvasReady={handleCanvasReady}
                 />
               </div>
@@ -325,6 +398,41 @@ export default function EditorPage() {
                   initialData={productData}
                   onChange={handleProductDataChange}
                 />
+                
+                {/* 字体自定义 */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900">字体设置</h3>
+                  
+                  <FontCustomizer
+                    title="商品名称"
+                    config={fontConfigs.product_name}
+                    onChange={(config) => handleFontConfigChange('product_name', config)}
+                  />
+                  
+                  <FontCustomizer
+                    title="品牌"
+                    config={fontConfigs.brand}
+                    onChange={(config) => handleFontConfigChange('brand', config)}
+                  />
+                  
+                  <FontCustomizer
+                    title="价格"
+                    config={fontConfigs.price}
+                    onChange={(config) => handleFontConfigChange('price', config)}
+                  />
+                  
+                  <FontCustomizer
+                    title="卖点"
+                    config={fontConfigs.selling_points}
+                    onChange={(config) => handleFontConfigChange('selling_points', config)}
+                  />
+                  
+                  <FontCustomizer
+                    title="规格"
+                    config={fontConfigs.specs}
+                    onChange={(config) => handleFontConfigChange('specs', config)}
+                  />
+                </div>
               </div>
             </div>
           </div>

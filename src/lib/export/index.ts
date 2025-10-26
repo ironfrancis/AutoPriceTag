@@ -1,6 +1,5 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-// import { fabric } from 'fabric'; // 移除静态导入
 
 export interface ExportOptions {
   format: 'png' | 'jpg' | 'pdf';
@@ -10,55 +9,54 @@ export interface ExportOptions {
 }
 
 export interface CanvasExportOptions extends ExportOptions {
-  canvas: any; // fabric.Canvas
+  canvas: HTMLCanvasElement;
 }
 
-// 从 Fabric.js 画布导出图片
+// 从原生HTML5 Canvas导出图片
 export async function exportCanvasAsImage(options: CanvasExportOptions): Promise<Blob> {
   const { canvas, format = 'png', quality = 1, dpi = 300 } = options;
   
   // 设置画布导出参数
   const multiplier = dpi / 96; // 96 DPI 是标准屏幕 DPI
   
-  // 获取画布数据 URL
-  const dataURL = canvas.toDataURL({
-    format: format === 'jpg' ? 'jpeg' : format,
-    quality: quality,
-    multiplier: multiplier,
-  });
-
+  // 创建高质量画布
+  const exportCanvas = document.createElement('canvas');
+  const exportCtx = exportCanvas.getContext('2d');
+  
+  if (!exportCtx) {
+    throw new Error('Failed to get canvas context');
+  }
+  
+  // 设置导出画布尺寸
+  exportCanvas.width = canvas.width * multiplier;
+  exportCanvas.height = canvas.height * multiplier;
+  
+  // 设置高质量渲染
+  exportCtx.imageSmoothingEnabled = true;
+  exportCtx.imageSmoothingQuality = 'high';
+  
+  // 绘制到导出画布
+  exportCtx.drawImage(canvas, 0, 0, exportCanvas.width, exportCanvas.height);
+  
   // 转换为 Blob
   return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0);
-      
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-        } else {
-          reject(new Error('Failed to create blob'));
-        }
-      }, `image/${format}`, quality);
-    };
-    
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = dataURL;
+    exportCanvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Failed to create blob'));
+      }
+    }, `image/${format}`, quality);
   });
 }
 
-// 从 Fabric.js 画布导出 PDF
+// 从原生HTML5 Canvas导出PDF
 export async function exportCanvasAsPDF(options: CanvasExportOptions): Promise<Blob> {
   const { canvas, dpi = 300, filename = 'price-tag.pdf' } = options;
   
   // 获取画布尺寸（转换为毫米）
-  const canvasWidth = canvas.getWidth();
-  const canvasHeight = canvas.getHeight();
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
   
   // 转换为毫米 (1 inch = 25.4mm, 96 DPI)
   const widthMM = (canvasWidth / 96) * 25.4;
@@ -72,11 +70,7 @@ export async function exportCanvasAsPDF(options: CanvasExportOptions): Promise<B
   });
   
   // 获取画布数据 URL
-  const dataURL = canvas.toDataURL({
-    format: 'png',
-    quality: 1,
-    multiplier: dpi / 96,
-  });
+  const dataURL = canvas.toDataURL('image/png', 1);
   
   // 添加图片到 PDF
   pdf.addImage(dataURL, 'PNG', 0, 0, widthMM, heightMM);
@@ -125,7 +119,7 @@ export function downloadFile(blob: Blob, filename: string): void {
 
 // 批量导出多个画布
 export async function exportMultipleCanvases(
-  canvases: any[], // fabric.Canvas[]
+  canvases: HTMLCanvasElement[],
   options: ExportOptions
 ): Promise<Blob[]> {
   const exportPromises = canvases.map(canvas => {
@@ -158,10 +152,31 @@ export function generateFilename(
 
 // 导出工具类
 export class ExportManager {
-  private canvas: any | null = null; // fabric.Canvas
+  private canvas: HTMLCanvasElement | null = null;
   
-  setCanvas(canvas: any) { // fabric.Canvas
+  setCanvas(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+    console.log('Canvas set:', canvas.width, 'x', canvas.height);
+  }
+  
+  // 强制渲染画布内容（用于导出前确保内容存在）
+  forceRender() {
+    if (!this.canvas) return false;
+    
+    const ctx = this.canvas.getContext('2d');
+    if (!ctx) return false;
+    
+    // 检查画布是否有内容
+    const imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    const hasContent = imageData.data.some(pixel => pixel !== 0);
+    
+    console.log('Canvas content check:', {
+      hasContent,
+      canvasSize: { width: this.canvas.width, height: this.canvas.height },
+      imageDataSize: imageData.data.length
+    });
+    
+    return hasContent;
   }
   
   async export(options: ExportOptions & { productName?: string }): Promise<void> {
@@ -169,18 +184,33 @@ export class ExportManager {
       throw new Error('Canvas not set');
     }
     
+    console.log('Starting export:', options);
+    console.log('Canvas dimensions:', this.canvas.width, 'x', this.canvas.height);
+    
+    // 检查画布内容
+    const hasContent = this.forceRender();
+    if (!hasContent) {
+      console.warn('Canvas appears to be empty, proceeding anyway...');
+    }
+    
     const { productName = 'price-tag', format, ...exportOptions } = options;
     const filename = generateFilename(productName, format);
     
     let blob: Blob;
     
-    if (format === 'pdf') {
-      blob = await exportCanvasAsPDF({ ...exportOptions, canvas: this.canvas, format });
-    } else {
-      blob = await exportCanvasAsImage({ ...exportOptions, canvas: this.canvas, format });
+    try {
+      if (format === 'pdf') {
+        blob = await exportCanvasAsPDF({ ...exportOptions, canvas: this.canvas, format });
+      } else {
+        blob = await exportCanvasAsImage({ ...exportOptions, canvas: this.canvas, format });
+      }
+      
+      console.log('Export successful, blob size:', blob.size);
+      downloadFile(blob, filename);
+    } catch (error) {
+      console.error('Export failed:', error);
+      throw error;
     }
-    
-    downloadFile(blob, filename);
   }
   
   async exportHighQuality(options: Omit<ExportOptions, 'quality' | 'dpi'> & { productName?: string }): Promise<void> {

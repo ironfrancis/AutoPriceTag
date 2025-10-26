@@ -1,4 +1,7 @@
 import { LabelTemplate } from '../types';
+import { simpleTwoColumnTemplate } from './simpleTwoColumn';
+
+// 基础简约款模板
 
 // 基础简约款模板
 export const simpleTemplate: LabelTemplate = {
@@ -349,6 +352,7 @@ export const defaultTemplates: LabelTemplate[] = [
   simpleTemplate,
   promotionTemplate,
   premiumTemplate,
+  simpleTwoColumnTemplate,
 ];
 
 // 根据ID获取模板

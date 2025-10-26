@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: 'Noto Sans SC', system-ui, sans-serif;
+}
+
+/* 全局样式 */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+  
+  .btn-outline {
+    @apply border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-100;
+  }
+  
+  .card {
+    @apply rounded-xl border border-gray-200 bg-white shadow-sm transition-colors;
+  }
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c5c5c5;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

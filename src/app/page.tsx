@@ -4,32 +4,30 @@ import { ArrowRight, Palette, Download, Zap } from "lucide-react";
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
-      {/* 导航栏 */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm">
+      {/* 极简导航栏 */}
+      <nav className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center space-x-3">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-orange-500 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">APT</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">AutoPriceTag</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/docs"
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-              >
+              <span className="text-xl font-semibold text-gray-900">AutoPriceTag</span>
+            </Link>
+            
+            <div className="flex items-center space-x-6">
+              <Link href="/editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
+                智能编辑器
+              </Link>
+              <Link href="/cases" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
+                案例展示
+              </Link>
+              <Link href="/docs" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
                 文档
               </Link>
               <Link
-                href="/docs/label-rendering"
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                技术文档
-              </Link>
-              <Link
                 href="/editor"
-                className="btn btn-primary px-6 py-2"
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
               >
                 开始设计
               </Link>
@@ -58,10 +56,10 @@ export default function Home() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
-                href="/layout"
+                href="/cases"
                 className="btn btn-outline px-8 py-3 text-lg"
               >
-                查看排版
+                浏览案例
               </Link>
             </div>
           </div>
@@ -127,6 +125,15 @@ export default function Home() {
             <p className="mt-4 text-lg text-gray-600">
               多种风格模板，满足不同场景需求
             </p>
+            <div className="mt-6">
+              <Link
+                href="/editor"
+                className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
+              >
+                立即创建标签
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
           </div>
           
           <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-3">
