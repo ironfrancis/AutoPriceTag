@@ -312,10 +312,11 @@ export default function DraggableEditorPage() {
     // 卖点：每个卖点独立编辑
     else if (elementId.startsWith('selling_point_')) {
       const index = parseInt(elementId.replace('selling_point_', ''));
-      const sellingPoints = [...productData.sellingPoints];
+      const sellingPoints = productData.sellingPoints || [];
       if (sellingPoints[index] !== undefined) {
-        sellingPoints[index] = newText;
-        updateProductData({ ...productData, sellingPoints });
+        const newSellingPoints = [...sellingPoints];
+        newSellingPoints[index] = newText;
+        updateProductData({ ...productData, sellingPoints: newSellingPoints });
       }
     }
     // 规格：需要从 layout 获取 fieldKey

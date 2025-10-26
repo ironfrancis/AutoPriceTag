@@ -1,8 +1,10 @@
 import Dexie, { Table } from 'dexie';
-import { LabelDesign, ProductData } from '../types';
+import { LabelDesign, ProductData, HistoryRecord, UserSettings } from '../types';
 
-// 兼容旧类型定义
-type SavedLabel = LabelDesign;
+// 数据库保存的标签类型（包含 id）
+export interface SavedLabel extends LabelDesign {
+  id: string;
+}
 
 export class AutoPriceTagDB extends Dexie {
   templates!: Table<SavedLabel>;
@@ -117,7 +119,7 @@ export async function getHistoryRecords(limit = 50): Promise<HistoryRecord[]> {
 }
 
 // 保存历史记录
-export async function saveHistoryRecord(record: Omit<HistoryRecord, 'id'>): Promise<string> {
+export async function saveHistoryRecord(record: Omit<HistoryRecord, 'id' | 'createdAt'>): Promise<string> {
   try {
     const database = getDB();
     if (!database) {
@@ -125,7 +127,11 @@ export async function saveHistoryRecord(record: Omit<HistoryRecord, 'id'>): Prom
     }
     
     const id = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    await database.history.add({ ...record, id });
+    await database.history.add({ 
+      ...record, 
+      id,
+      createdAt: new Date().toISOString()
+    });
     return id;
   } catch (error) {
     console.error('保存历史记录失败:', error);
@@ -179,7 +185,7 @@ export async function saveLabel(label: Omit<SavedLabel, 'id' | 'createdAt' | 'up
     }
     
     const id = `label_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date();
+    const now = new Date().toISOString();
     await database.savedLabels.add({
       ...label,
       id,
@@ -236,7 +242,7 @@ export async function updateSavedLabel(id: string, updates: Partial<SavedLabel>)
     
     await database.savedLabels.update(id, {
       ...updates,
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('更新标签失败:', error);

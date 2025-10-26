@@ -9,10 +9,14 @@
 export interface ProductData {
   name: string;              // 商品名称 - 核心字段
   price: number;            // 价格 - 核心字段，会特殊样式处理
-  brand: string;            // 品牌
-  sellingPoints: string[];  // 卖点列表
-  specs: Record<string, string>; // 规格参数（键值对）
-  customFields: Record<string, any>; // 自定义字段（用户可添加任意字段）
+  brand?: string;           // 品牌
+  sellingPoints?: string[];  // 卖点列表
+  specs?: Record<string, string>; // 规格参数（键值对）
+  customFields?: Record<string, any>; // 自定义字段（用户可添加任意字段）
+  originalPrice?: number;  // 原价
+  discount?: number;       // 折扣
+  logo?: string;           // 商品logo
+  barcode?: string;        // 条码
 }
 
 /**
@@ -121,4 +125,111 @@ export interface LabelDesign {
     editable?: boolean; // 是否可编辑
     [key: string]: any;
   };
+}
+
+/**
+ * 历史记录
+ */
+export interface HistoryRecord {
+  id: string;
+  templateId?: string;
+  labelName?: string;
+  createdAt: string; // ISO格式字符串
+}
+
+/**
+ * 用户设置
+ */
+export interface UserSettings {
+  id?: string;
+  defaultPaperSize: {
+    name: string;
+    width: number;
+    height: number;
+    dpi: number;
+  };
+  defaultLabelSize: {
+    width: number;
+    height: number;
+  };
+  recentTemplates: any[];
+  autoSaveEnabled: boolean;
+  language: string;
+}
+
+/**
+ * 元素样式
+ */
+export interface ElementStyle {
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: string | number;
+  color?: string;
+  backgroundColor?: string;
+  textAlign?: string;
+  borderRadius?: number;
+  [key: string]: any;
+}
+
+/**
+ * 背景样式
+ */
+export interface BackgroundStyle {
+  type: 'solid' | 'gradient';
+  color?: string;
+  gradient?: {
+    start: string;
+    end: string;
+    direction: 'horizontal' | 'vertical' | 'diagonal';
+  };
+}
+
+/**
+ * 标签元素
+ */
+export interface LabelElement {
+  id: string;
+  type: string;
+  content: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  style: ElementStyle;
+  locked: boolean;
+  editable: boolean;
+}
+
+/**
+ * 标签模板
+ */
+export interface LabelTemplate {
+  id: string;
+  name: string;
+  type: 'simple' | 'promotion' | 'premium';
+  size: {
+    width: number;
+    height: number;
+  };
+  background: BackgroundStyle;
+  elements: LabelElement[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 打印画布
+ */
+export interface PrintCanvas {
+  size: {
+    width: number;
+    height: number;
+  };
+  labels: PlacedLabel[];
+}
+
+/**
+ * 已放置的标签
+ */
+export interface PlacedLabel {
+  labelId: string;
+  position: { x: number; y: number };
 }

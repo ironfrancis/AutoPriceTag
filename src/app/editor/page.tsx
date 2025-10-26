@@ -156,10 +156,16 @@ export default function EditorPage() {
       // 保存标签
       const labelName = productData.name || `标签_${new Date().toLocaleString()}`;
       await saveLabel({
-        name: labelName,
+        labelId: `label_${Date.now()}`,
+        labelName,
         labelSize,
         productData,
-        thumbnail,
+        layout: {
+          elements: []
+        },
+        settings: {
+          editable: true
+        }
       });
 
       setSaveMessage('标签保存成功！');

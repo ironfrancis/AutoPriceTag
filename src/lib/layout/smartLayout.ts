@@ -93,10 +93,13 @@ function analyzeContent(productData: ProductData): ContentAnalysis {
   
   // 促销状态分析
   let urgency: 'normal' | 'promotion' | 'clearance' = 'normal';
-  if (productData.discount && productData.discount > 20) {
+  const discount = (productData as any).discount;
+  const originalPrice = (productData as any).originalPrice;
+  
+  if (discount && discount > 20) {
     urgency = 'promotion';
   }
-  if (productData.originalPrice && productData.price < productData.originalPrice * 0.5) {
+  if (originalPrice && productData.price < originalPrice * 0.5) {
     urgency = 'clearance';
   }
   
