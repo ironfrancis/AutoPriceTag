@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { X, Trash2, Download } from 'lucide-react';
-import { SavedLabel } from '@/lib/types';
+import { LabelDesign } from '@/lib/types';
 import { getSavedLabels, deleteSavedLabel } from '@/lib/db';
 
 interface SavedLabelsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoadLabel: (label: SavedLabel) => void;
+  onLoadLabel: (label: LabelDesign) => void;
 }
 
 export default function SavedLabelsDialog({ 
@@ -16,7 +16,7 @@ export default function SavedLabelsDialog({
   onClose, 
   onLoadLabel 
 }: SavedLabelsDialogProps) {
-  const [savedLabels, setSavedLabels] = useState<SavedLabel[]>([]);
+  const [savedLabels, setSavedLabels] = useState<LabelDesign[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -44,7 +44,7 @@ export default function SavedLabelsDialog({
     setDeletingId(id);
     try {
       await deleteSavedLabel(id);
-      setSavedLabels(prev => prev.filter(label => label.id !== id));
+      setSavedLabels(prev => prev.filter(label => label.labelId !== id));
     } catch (error) {
       console.error('删除标签失败:', error);
       alert('删除失败，请重试');
@@ -53,7 +53,7 @@ export default function SavedLabelsDialog({
     }
   };
 
-  const handleLoadLabel = (label: SavedLabel) => {
+  const handleLoadLabel = (label: LabelDesign) => {
     onLoadLabel(label);
     onClose();
   };
@@ -92,23 +92,22 @@ export default function SavedLabelsDialog({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {savedLabels.map((label) => (
-                <div key={label.id} className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div key={label.labelId} className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow">
                   {/* 缩略图 */}
                   <div className="aspect-[4/3] bg-white border border-gray-200 rounded-lg mb-3 overflow-hidden">
-                    <img
-                      src={label.thumbnail}
-                      alt={label.name}
-                      className="w-full h-full object-contain"
-                    />
+                    {/* 省略缩略图 */}
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <p>{label.labelName || '标签设计'}</p>
+                    </div>
                   </div>
                   
                   {/* 标签信息 */}
                   <div className="space-y-2">
-                    <h3 className="font-medium text-gray-900 truncate">{label.name}</h3>
+                    <h3 className="font-medium text-gray-900 truncate">{label.labelName || '未命名标签'}</h3>
                     <div className="text-sm text-gray-600">
                       <p>尺寸: {label.labelSize.width}×{label.labelSize.height}mm</p>
-                      <p>商品: {label.productData.name}</p>
-                      <p>保存时间: {new Date(label.createdAt).toLocaleString()}</p>
+                      <p>商品: {label.productData?.name || '未知'}</p>
+                      <p>保存时间: {label.updatedAt ? new Date(label.updatedAt).toLocaleString() : '未知'}</p>
                     </div>
                     
                     {/* 操作按钮 */}
@@ -120,11 +119,11 @@ export default function SavedLabelsDialog({
                         加载
                       </button>
                       <button
-                        onClick={() => handleDeleteLabel(label.id)}
-                        disabled={deletingId === label.id}
+                        onClick={() => handleDeleteLabel(label.labelId || '')}
+                        disabled={deletingId === label.labelId}
                         className="btn btn-outline px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                       >
-                        {deletingId === label.id ? (
+                        {deletingId === label.labelId ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
                         ) : (
                           <Trash2 className="h-4 w-4" />

@@ -3,17 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Trash2 } from 'lucide-react';
 
-interface LabelDesign {
-  labelId?: string;
-  labelName?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  labelSize: { width: number; height: number };
-  productData: any;
-  layout: { elements: any[] };
-  fontConfigs: any;
-  settings: any;
-}
+import { LabelDesign } from '@/lib/types';
 
 interface DesignListDialogProps {
   isOpen: boolean;

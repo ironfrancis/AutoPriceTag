@@ -1,8 +1,11 @@
 import Dexie, { Table } from 'dexie';
-import { LabelTemplate, ProductData, HistoryRecord, UserSettings, SavedLabel } from '../types';
+import { LabelDesign, ProductData } from '../types';
+
+// 兼容旧类型定义
+type SavedLabel = LabelDesign;
 
 export class AutoPriceTagDB extends Dexie {
-  templates!: Table<LabelTemplate>;
+  templates!: Table<SavedLabel>;
   products!: Table<ProductData>;
   history!: Table<HistoryRecord>;
   settings!: Table<UserSettings>;
