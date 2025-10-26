@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RotateCcw, Lock, Unlock } from 'lucide-react';
 
 interface SizeInputProps {
@@ -14,6 +14,12 @@ export default function SizeInput({ currentSize, onSizeChange, className = '' }:
   const [customHeight, setCustomHeight] = useState(currentSize.height || 35);
   const [isLocked, setIsLocked] = useState(false);
   const [aspectRatio, setAspectRatio] = useState((currentSize.width || 65) / (currentSize.height || 35));
+
+  // 监听 currentSize 变化，同步更新自定义尺寸输入框
+  useEffect(() => {
+    setCustomWidth(currentSize.width);
+    setCustomHeight(currentSize.height);
+  }, [currentSize]);
 
   const handleWidthChange = (width: number) => {
     setCustomWidth(width);

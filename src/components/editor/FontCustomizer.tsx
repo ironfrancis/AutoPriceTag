@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 // 字体配置接口
@@ -16,9 +16,16 @@ export interface FontConfig {
 // 字体预设
 const FONT_PRESETS = [
   { name: '系统默认', family: 'system-ui, -apple-system, sans-serif' },
+  { name: 'PingFang SC', family: 'PingFang SC, "PingFang SC", "Microsoft YaHei", sans-serif' },
+  { name: '微软雅黑', family: '"Microsoft YaHei", "微软雅黑", sans-serif' },
+  { name: '宋体', family: 'SimSun, "宋体", serif' },
+  { name: '黑体', family: 'SimHei, "黑体", sans-serif' },
+  { name: '楷体', family: 'KaiTi, "楷体", serif' },
+  { name: '仿宋', family: 'FangSong, "仿宋", serif' },
+  { name: '思源黑体', family: '"Noto Sans SC", "Source Han Sans SC", sans-serif' },
+  { name: '思源宋体', family: '"Noto Serif SC", "Source Han Serif SC", serif' },
+  { name: '阿里巴巴普惠体', family: '"Alibaba PuHuiTi", sans-serif' },
   { name: 'Inter', family: 'Inter, system-ui, sans-serif' },
-  { name: 'PingFang SC', family: 'PingFang SC, system-ui, sans-serif' },
-  { name: 'Noto Sans SC', family: 'Noto Sans SC, system-ui, sans-serif' },
   { name: 'Helvetica', family: 'Helvetica, Arial, sans-serif' },
   { name: 'Georgia', family: 'Georgia, serif' },
 ];
@@ -42,45 +49,61 @@ interface FontCustomizerProps {
 }
 
 export default function FontCustomizer({ config, onChange, title = "字体设置" }: FontCustomizerProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [currentFontFamily, setCurrentFontFamily] = useState(config.fontFamily);
+  const [isHovering, setIsHovering] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState(-1);
 
   const updateConfig = (updates: Partial<FontConfig>) => {
     onChange({ ...config, ...updates });
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      {/* 标题栏 */}
-      <div 
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center space-x-2">
-          <Type className="h-4 w-4 text-gray-600" />
-          <span className="text-sm font-medium text-gray-900">{title}</span>
-        </div>
-        <div className="text-xs text-gray-500">
-          {config.fontSize}px • {config.fontWeight} • {config.fontFamily.split(',')[0]}
-        </div>
-      </div>
-
-      {/* 展开内容 */}
-      {isExpanded && (
-        <div className="border-t border-gray-200 p-4 space-y-4">
+    <div className="space-y-4">
           {/* 字体族选择 */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">字体</label>
-            <select
-              value={config.fontFamily}
-              onChange={(e) => updateConfig({ fontFamily: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <div
+              className="relative"
+              onMouseEnter={() => setIsHovering(true)}
+              onMouseLeave={() => {
+                setIsHovering(false);
+                setHoveredIndex(-1);
+              }}
             >
-              {FONT_PRESETS.map(preset => (
-                <option key={preset.name} value={preset.family}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
+              <select
+                value={currentFontFamily}
+                onChange={(e) => {
+                  const newFont = e.target.value;
+                  setCurrentFontFamily(newFont);
+                  // 立即应用到画布
+                  updateConfig({ fontFamily: newFont });
+                }}
+                onMouseMove={(e) => {
+                  if (isHovering) {
+                    const selectElement = e.currentTarget;
+                    const hoveredFont = FONT_PRESETS[selectElement.selectedIndex]?.family;
+                    if (hoveredFont && selectElement.value !== currentFontFamily) {
+                      setHoveredIndex(selectElement.selectedIndex);
+                      updateConfig({ fontFamily: hoveredFont });
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  // 失去焦点时恢复原字体
+                  updateConfig({ fontFamily: currentFontFamily });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {FONT_PRESETS.map(preset => (
+                  <option 
+                    key={preset.name} 
+                    value={preset.family}
+                  >
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* 字体大小 */}
@@ -267,27 +290,6 @@ export default function FontCustomizer({ config, onChange, title = "字体设置
             </div>
           </div>
 
-          {/* 预览 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">预览</label>
-            <div className="p-3 bg-gray-50 rounded-md">
-              <div
-                style={{
-                  fontFamily: config.fontFamily,
-                  fontSize: `${config.fontSize}px`,
-                  fontWeight: config.fontWeight,
-                  fontStyle: config.fontStyle,
-                  color: config.color,
-                  textAlign: config.textAlign,
-                }}
-                className="text-gray-900"
-              >
-                示例文本 Sample Text
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

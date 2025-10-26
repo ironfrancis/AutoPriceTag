@@ -1,0 +1,73 @@
+{
+  "labelId": undefined,
+  "labelName": undefined,
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T11:45:00.000Z",
+  "labelSize": {
+    "width": 80,
+    "height": 50
+  },
+  "productData": {
+    "name": "高端无线蓝牙耳机",
+    "price": 299,
+    "brand": "TechSound",
+    "sellingPoints": ["降噪技术", "40小时续航"],
+    "specs": {
+      "颜色": "黑色",
+      "重量": "50g"
+    },
+    "customFields": {}
+  },
+  "layout": {
+    "elements": [
+      {
+        "id": "product_name",
+        "x": 10,
+        "y": 10,
+        "text": "高端无线蓝牙耳机"
+      },
+      {
+        "id": "brand",
+        "x": 10,
+        "y": 30,
+        "text": "TechSound"
+      },
+      {
+        "id": "product_price",
+        "x": 20,
+        "y": 20,
+        "text": "¥299"
+      }
+    ]
+  },
+  "fontConfigs": {
+    "product_name": {
+      "fontSize": 16,
+      "fontWeight": 500,
+      "fontStyle": "normal",
+      "textAlign": "left",
+      "color": "#111827",
+      "fontFamily": "system-ui, -apple-system, sans-serif"
+    },
+    "brand": {
+      "fontSize": 12,
+      "fontWeight": 400,
+      "fontStyle": "normal",
+      "textAlign": "left",
+      "color": "#6B7280",
+      "fontFamily": "system-ui, -apple-system, sans-serif"
+    },
+    "product_price": {
+      "fontSize": 20,
+      "fontWeight": 600,
+      "fontStyle": "normal",
+      "textAlign": "center",
+      "color": "#2563eb",
+      "fontFamily": "system-ui, -apple-system, sans-serif"
+    }
+  },
+  "settings": {
+    "editable": true
+  }
+}
+

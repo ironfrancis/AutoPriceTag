@@ -16,6 +16,33 @@ export interface CanvasExportOptions extends ExportOptions {
 export async function exportCanvasAsImage(options: CanvasExportOptions): Promise<Blob> {
   const { canvas, format = 'png', quality = 1, dpi = 300 } = options;
   
+  console.log('Export canvas as image:', {
+    canvasSize: { width: canvas.width, height: canvas.height },
+    format,
+    quality,
+    dpi
+  });
+  
+  // 验证画布尺寸
+  if (canvas.width === 0 || canvas.height === 0) {
+    throw new Error('Canvas has zero dimensions');
+  }
+  
+  // 验证画布内容（检查是否为空）
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to get canvas context');
+  }
+  
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const hasContent = imageData.data.some((pixel, index) => index % 4 !== 3 && pixel !== 0); // 忽略alpha通道
+  
+  console.log('Canvas content check:', { hasContent, pixelCount: imageData.data.length });
+  
+  if (!hasContent) {
+    console.warn('Canvas appears to be empty or only contains transparent pixels');
+  }
+  
   // 设置画布导出参数
   const multiplier = dpi / 96; // 96 DPI 是标准屏幕 DPI
   
@@ -24,12 +51,14 @@ export async function exportCanvasAsImage(options: CanvasExportOptions): Promise
   const exportCtx = exportCanvas.getContext('2d');
   
   if (!exportCtx) {
-    throw new Error('Failed to get canvas context');
+    throw new Error('Failed to get export canvas context');
   }
   
   // 设置导出画布尺寸
   exportCanvas.width = canvas.width * multiplier;
   exportCanvas.height = canvas.height * multiplier;
+  
+  console.log('Export canvas size:', { width: exportCanvas.width, height: exportCanvas.height });
   
   // 设置高质量渲染
   exportCtx.imageSmoothingEnabled = true;
@@ -42,6 +71,7 @@ export async function exportCanvasAsImage(options: CanvasExportOptions): Promise
   return new Promise((resolve, reject) => {
     exportCanvas.toBlob((blob) => {
       if (blob) {
+        console.log('Blob created successfully, size:', blob.size);
         resolve(blob);
       } else {
         reject(new Error('Failed to create blob'));
@@ -54,29 +84,45 @@ export async function exportCanvasAsImage(options: CanvasExportOptions): Promise
 export async function exportCanvasAsPDF(options: CanvasExportOptions): Promise<Blob> {
   const { canvas, dpi = 300, filename = 'price-tag.pdf' } = options;
   
-  // 获取画布尺寸（转换为毫米）
+  console.log('Export canvas as PDF:', {
+    canvasSize: { width: canvas.width, height: canvas.height },
+    dpi,
+    filename
+  });
+  
+  // 验证画布尺寸
+  if (canvas.width === 0 || canvas.height === 0) {
+    throw new Error('Canvas has zero dimensions');
+  }
+  
+  // 获取画布尺寸（mm转像素，1mm = 3.7795275591px）
   const canvasWidth = canvas.width;
   const canvasHeight = canvas.height;
   
-  // 转换为毫米 (1 inch = 25.4mm, 96 DPI)
-  const widthMM = (canvasWidth / 96) * 25.4;
-  const heightMM = (canvasHeight / 96) * 25.4;
+  // 转换为毫米
+  const widthMM = canvasWidth / 3.7795275591;
+  const heightMM = canvasHeight / 3.7795275591;
+  
+  console.log('PDF dimensions (mm):', { widthMM, heightMM });
   
   // 创建 PDF
   const pdf = new jsPDF({
     orientation: widthMM > heightMM ? 'landscape' : 'portrait',
     unit: 'mm',
     format: [widthMM, heightMM],
+    compress: true
   });
   
   // 获取画布数据 URL
   const dataURL = canvas.toDataURL('image/png', 1);
   
   // 添加图片到 PDF
-  pdf.addImage(dataURL, 'PNG', 0, 0, widthMM, heightMM);
+  pdf.addImage(dataURL, 'PNG', 0, 0, widthMM, heightMM, undefined, 'FAST');
   
   // 生成 Blob
   const pdfBlob = pdf.output('blob');
+  console.log('PDF created successfully, size:', pdfBlob.size);
+  
   return pdfBlob;
 }
 

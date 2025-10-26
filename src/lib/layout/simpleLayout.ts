@@ -11,14 +11,13 @@ export interface SimpleLayoutElement {
   align: 'left' | 'center' | 'right';
   lines: number;
   text: string;
-  area: 'text' | 'price'; // 所属区域
+  priority: number; // 优先级，用于排序
 }
 
 export interface SimpleLayoutResult {
   elements: SimpleLayoutElement[];
-  textAreaWidth: number; // 文字区域宽度
-  priceAreaWidth: number; // 价格区域宽度
-  priceAreaHeight: number; // 价格区域高度（正方形）
+  totalWidth: number; // 总宽度
+  totalHeight: number; // 总高度
 }
 
 // 简洁布局配置
@@ -51,23 +50,110 @@ const MINIMALIST_CONFIG: SimpleLayoutConfig = {
   textAreaRatio: 0.6, // 轻微调整比例
 };
 
-// 文字区域元素定义（按优先级排序）
-const TEXT_ELEMENTS = [
-  { id: 'product_name', key: 'name', priority: 1, weight: 0.4 },
-  { id: 'brand', key: 'brand', priority: 2, weight: 0.2 },
-  { id: 'selling_points', key: 'sellingPoints', priority: 3, weight: 0.25 },
-  { id: 'specs', key: 'specs', priority: 4, weight: 0.15 },
+/**
+ * 元素定义接口
+ */
+interface ElementDefinition {
+  id: string;
+  type: 'core' | 'selling_point' | 'spec' | 'custom_field';
+  key: string;
+  priority: number;
+  weight: number;
+  fieldKey?: string;
+  text?: string;
+}
+
+/**
+ * 核心元素定义（固定元素）
+ * 
+ * 核心设计理念：
+ * 1. 所有在 productData 中有值的字段都应该被创建为可拖拽元素
+ * 2. 每个卖点、规格、自定义字段都是独立的元素组件
+ * 3. 元素按优先级排序：商品名 > 价格 > 品牌 > 卖点 > 规格 > 自定义字段
+ * 4. 权重用于分配垂直空间
+ */
+const CORE_ELEMENTS = [
+  { id: 'product_name', type: 'core' as const, key: 'name', priority: 1, weight: 0.25 },
+  { id: 'product_price', type: 'core' as const, key: 'price', priority: 2, weight: 0.20 },
+  { id: 'brand', type: 'core' as const, key: 'brand', priority: 3, weight: 0.15 },
 ];
 
 /**
- * 计算简洁布局
+ * 从 ProductData 生成所有元素定义
+ * 每个卖点、规格、自定义字段都是独立元素
+ * 
+ * 元素 ID 规则：
+ * - 核心字段: product_name, product_price, brand
+ * - 卖点: selling_point_0, selling_point_1, ...
+ * - 规格: spec_color, spec_weight, ... (使用键名的小写+下划线)
+ * - 自定义字段: custom_field_name, custom_origin, ...
+ */
+function generateElementDefinitions(productData: ProductData): ElementDefinition[] {
+  const elements: ElementDefinition[] = [];
+  
+  // 核心字段
+  elements.push(...CORE_ELEMENTS);
+  
+  // 卖点：每个独立元素
+  (productData.sellingPoints || []).forEach((point, index) => {
+    if (point && point.trim()) {
+      elements.push({
+        id: `selling_point_${index}`,
+        type: 'selling_point',
+        key: `sellingPoints[${index}]`,
+        priority: 4 + index * 0.01,
+        weight: 0.08,
+        text: point
+      });
+    }
+  });
+  
+  // 规格：每个键值对独立元素
+  Object.entries(productData.specs || {}).forEach(([key, value], index) => {
+    if (key && value) {
+      // 规范化 key：转小写、空格替换为下划线
+      const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
+      elements.push({
+        id: `spec_${normalizedKey}`,
+        type: 'spec',
+        key: `specs.${key}`,
+        fieldKey: key,
+        priority: 5 + index * 0.01,
+        weight: 0.06,
+        text: `${key}: ${value}`
+      });
+    }
+  });
+  
+  // 自定义字段：每个独立元素
+  Object.entries(productData.customFields || {}).forEach(([key, value], index) => {
+    if (key && value) {
+      // 规范化 key：转小写、空格替换为下划线
+      const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
+      elements.push({
+        id: `custom_${normalizedKey}`,
+        type: 'custom_field',
+        key: `customFields.${key}`,
+        fieldKey: key,
+        priority: 6 + index * 0.01,
+        weight: 0.06,
+        text: `${key}: ${value}`
+      });
+    }
+  });
+  
+  return elements;
+}
+
+/**
+ * 计算简洁布局（统一垂直布局，无分割）
  */
 export function calculateSimpleLayout(
   labelWidth: number,
   labelHeight: number,
   productData: ProductData,
-  config: SimpleLayoutConfig = MINIMALIST_CONFIG, // 使用极简配置作为默认
-  textAreaRatio: number = 0.6 // 使用更平衡的比例
+  config: SimpleLayoutConfig = MINIMALIST_CONFIG,
+  textAreaRatio: number = 0.6 // 保留参数以兼容旧代码
 ): SimpleLayoutResult {
   // 转换为像素单位
   const widthPx = mmToPixels(labelWidth);
@@ -75,84 +161,155 @@ export function calculateSimpleLayout(
   const paddingPx = mmToPixels(config.padding);
   const spacingPx = mmToPixels(config.elementSpacing);
 
-  // 计算区域划分（使用自定义比例）
-  const textAreaWidth = widthPx * textAreaRatio - paddingPx;
-  const priceAreaWidth = widthPx * (1 - textAreaRatio) - paddingPx;
-  const priceAreaHeight = Math.min(priceAreaWidth, heightPx - paddingPx * 2); // 正方形
-  
-  // 计算文字区域可用高度
-  const textAreaHeight = heightPx - paddingPx * 2;
+  // 计算可用区域（去掉内边距）
+  const availableWidth = widthPx - paddingPx * 2;
+  const availableHeight = heightPx - paddingPx * 2;
 
-  // 获取有效的文字元素
-  const validTextElements = getValidTextElements(productData);
+  // 获取所有有效元素
+  const validElements = getValidElements(productData);
   
-  const elements: SimpleLayoutElement[] = [];
-  
-  // 布局文字区域
-  if (validTextElements.length > 0) {
-    const textElements = layoutTextArea(
-      validTextElements,
-      productData,
-      textAreaWidth,
-      textAreaHeight,
-      paddingPx,
-      spacingPx,
-      config
-    );
-    elements.push(...textElements);
-  }
-
-  // 布局价格区域
-  const priceElement = layoutPriceArea(
+  // 布局所有元素（统一垂直排列）
+  const elements = layoutAllElements(
+    validElements,
     productData,
-    priceAreaWidth,
-    priceAreaHeight,
-    widthPx - priceAreaWidth - paddingPx, // 价格区域起始X位置
+    availableWidth,
+    availableHeight,
     paddingPx,
+    paddingPx, // startX
+    paddingPx, // startY
+    spacingPx,
     config
   );
-  if (priceElement) {
-    elements.push(priceElement);
-  }
 
   return {
     elements,
-    textAreaWidth,
-    priceAreaWidth,
-    priceAreaHeight
+    totalWidth: widthPx,
+    totalHeight: heightPx
   };
 }
 
 /**
- * 获取有效的文字元素
+ * 获取有效的元素
+ * 
+ * 设计原则：
+ * 1. 动态生成所有元素：核心字段 + 卖点 + 规格 + 自定义字段
+ * 2. 空字符串或 undefined 的字段会被过滤掉（在生成时过滤）
+ * 3. 确保所有有效字段都会显示在标签上，除非用户手动删除
+ */
+function getValidElements(productData: ProductData): ElementDefinition[] {
+  // 使用新的动态生成函数
+  return generateElementDefinitions(productData);
+}
+
+/**
+ * 获取有效的文字元素（保留以兼容旧代码）
  */
 function getValidTextElements(productData: ProductData) {
-  return TEXT_ELEMENTS.filter(element => {
-    const content = getElementContent(element.key, productData);
-    return content && content.trim().length > 0;
-  });
+  return getValidElements(productData);
 }
 
 /**
  * 获取元素内容
+ * 
+ * 注意：此函数现在主要用于单个元素的文本获取
+ * 对于动态元素（卖点、规格、自定义字段），使用 ElementDefinition 中的 text
  */
-function getElementContent(key: string, productData: ProductData): string {
+function getElementContent(key: string, productData: ProductData, elementDef?: ElementDefinition): string {
+  // 如果有 elementDef，使用其预生成的 text
+  if (elementDef?.text) {
+    return elementDef.text;
+  }
+  
+  // 核心字段
   switch (key) {
     case 'name':
       return productData.name || '';
     case 'brand':
       return productData.brand || '';
-    case 'sellingPoints':
-      return productData.sellingPoints?.[0] || '';
-    case 'specs':
-      return productData.specs ? Object.values(productData.specs).join(' ') : '';
+    case 'price':
+      return productData.price ? `¥${productData.price}` : '';
     default:
       return '';
   }
 }
 
 /**
- * 布局文字区域
+ * 布局所有元素（统一垂直布局）
+ * 
+ * 核心设计：
+ * 1. 所有元素按权重分配垂直空间，确保都显示在可见区域内
+ * 2. 价格元素特殊处理，使用更大的字体并居中对齐
+ * 3. 其他元素左对齐，自动换行
+ * 4. 元素间距为 config.elementSpacing（默认2mm）
+ * 
+ * 可见性保证：
+ * - 所有元素的初始 Y 坐标都会计算在内边距范围内
+ * - 使用实际高度（actualHeight）而非分配高度，确保元素不溢出
+ * - 元素间距确保不重叠
+ */
+function layoutAllElements(
+  elements: any[],
+  productData: ProductData,
+  areaWidth: number,
+  areaHeight: number,
+  paddingPx: number,
+  startX: number,
+  startY: number,
+  spacingPx: number,
+  config: SimpleLayoutConfig
+): SimpleLayoutElement[] {
+  const result: SimpleLayoutElement[] = [];
+  let currentY = startY;
+  
+  // 计算每个元素的高度分配
+  // 使用权重系统确保所有元素都能显示在可见区域内
+  const totalWeight = elements.reduce((sum, el) => sum + el.weight, 0);
+  const totalSpacing = (elements.length - 1) * spacingPx;
+  const availableHeight = areaHeight - totalSpacing;
+  
+  for (const element of elements) {
+    const content = getElementContent(element.key, productData, element);
+    if (!content) continue;
+    
+    // 根据权重分配高度
+    // 确保所有元素都有合理的显示空间
+    const allocatedHeight = (element.weight / totalWeight) * availableHeight;
+    
+    // 价格元素使用不同的字体计算（更大更醒目）
+    const fontSize = element.id === 'product_price'
+      ? calculatePriceFontSize(content, areaWidth, allocatedHeight, config)
+      : calculateOptimalFontSizeForArea(content, areaWidth, allocatedHeight, config);
+    
+    // 计算文本布局（自动换行，最多3行）
+    const { lines, text } = calculateTextLayout(content, areaWidth, fontSize);
+    // 使用实际高度而非分配高度，确保元素不溢出可见区域
+    const actualHeight = fontSize * lines * config.lineHeight;
+    
+    // 对齐方式：价格居中，其他左对齐
+    const align = element.id === 'product_price' ? 'center' : 'left';
+    
+    result.push({
+      id: element.id,
+      x: startX, // x坐标固定为起始位置，使用内边距
+      y: currentY, // y坐标垂直排列
+      width: areaWidth, // 宽度为整个可用区域
+      height: actualHeight, // 高度为实际文本高度
+      fontSize,
+      align,
+      lines,
+      text,
+      priority: element.priority
+    });
+    
+    // 更新当前 Y 坐标，加上元素高度和间距
+    currentY += actualHeight + spacingPx;
+  }
+  
+  return result;
+}
+
+/**
+ * 布局文字区域（保留以兼容旧代码）
  */
 function layoutTextArea(
   elements: any[],
@@ -161,97 +318,14 @@ function layoutTextArea(
   areaHeight: number,
   startX: number,
   startY: number,
+  spacingPx: number,
   config: SimpleLayoutConfig
 ): SimpleLayoutElement[] {
-  const result: SimpleLayoutElement[] = [];
-  let currentY = startY;
-  
-  // 计算每个元素的高度分配
-  const totalWeight = elements.reduce((sum, el) => sum + el.weight, 0);
-  const totalSpacing = (elements.length - 1) * mmToPixels(config.elementSpacing);
-  const availableHeight = areaHeight - totalSpacing;
-  
-  for (const element of elements) {
-    const content = getElementContent(element.key, productData);
-    if (!content) continue;
-    
-    // 根据权重分配高度
-    const allocatedHeight = (element.weight / totalWeight) * availableHeight;
-    
-    // 计算最优字体大小
-    const fontSize = calculateOptimalFontSizeForArea(
-      content,
-      areaWidth,
-      allocatedHeight,
-      config
-    );
-    
-    // 计算文本布局
-    const { lines, text } = calculateTextLayout(content, areaWidth, fontSize);
-    const actualHeight = fontSize * lines * config.lineHeight;
-    
-    result.push({
-      id: element.id,
-      x: startX,
-      y: currentY,
-      width: areaWidth,
-      height: actualHeight,
-      fontSize,
-      align: 'left',
-      lines,
-      text,
-      area: 'text'
-    });
-    
-    currentY += actualHeight + mmToPixels(config.elementSpacing);
-  }
-  
-  return result;
+  // 简化为调用新函数
+  const paddingPx = mmToPixels(config.padding);
+  return layoutAllElements(elements, productData, areaWidth, areaHeight, paddingPx, startX, startY, spacingPx, config);
 }
 
-/**
- * 布局价格区域
- */
-function layoutPriceArea(
-  productData: ProductData,
-  areaWidth: number,
-  areaHeight: number,
-  startX: number,
-  startY: number,
-  config: SimpleLayoutConfig
-): SimpleLayoutElement | null {
-  if (!productData.price) return null;
-  
-  const priceText = `¥${productData.price.toFixed(2)}`;
-  
-  // 计算价格字体大小（使用更大的字体，适合价格显示）
-  const fontSize = calculatePriceFontSize(
-    priceText,
-    areaWidth,
-    areaHeight,
-    config
-  );
-  
-  // 计算文本布局
-  const { lines, text } = calculateTextLayout(priceText, areaWidth, fontSize);
-  
-  // 计算垂直居中位置
-  const textHeight = fontSize * lines * config.lineHeight;
-  const verticalCenter = startY + (areaHeight - textHeight) / 2;
-  
-  return {
-    id: 'product_price',
-    x: startX,
-    y: verticalCenter,
-    width: areaWidth,
-    height: textHeight,
-    fontSize,
-    align: 'center',
-    lines,
-    text,
-    area: 'price'
-  };
-}
 
 /**
  * 计算价格字体大小（专门为价格优化）
@@ -430,6 +504,10 @@ function mmToPixels(mm: number): number {
 export function pixelsToMm(pixels: number): number {
   return pixels / 3.7795275591;
 }
+
+// 导出函数供其他模块使用
+export { generateElementDefinitions };
+export type { ElementDefinition };
 
 // 保持向后兼容的接口
 export interface LayoutElement {

@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   },
   
   // 确保客户端组件正确标记
-  transpilePackages: ['fabric', 'html2canvas', 'jspdf'],
+  transpilePackages: ['fabric', 'html2canvas', 'jspdf', 'konva', 'react-konva'],
 };
 
 export default nextConfig;

@@ -27,72 +27,74 @@ export default function ProductForm({
 
   const [customFields, setCustomFields] = useState<Array<{key: string, value: string}>>([{key: '', value: ''}]);
 
-  useEffect(() => {
-    onChange(formData);
-  }, [formData, onChange]);
+  // 移除自动 onChange，改为手动触发
+  // useEffect(() => {
+  //   onChange(formData);
+  // }, [formData, onChange]);
 
   const handleInputChange = (field: keyof ProductData, value: any) => {
-    setFormData(prev => ({
-      ...prev,
+    const newFormData = {
+      ...formData,
       [field]: value
-    }));
+    };
+    setFormData(newFormData);
+    // 立即通知外部更新
+    onChange(newFormData);
   };
 
   const handleSellingPointChange = (index: number, value: string) => {
     const currentSellingPoints = formData.sellingPoints || [];
     const newSellingPoints = [...currentSellingPoints];
     newSellingPoints[index] = value;
-    setFormData(prev => ({
-      ...prev,
+    const newFormData = {
+      ...formData,
       sellingPoints: newSellingPoints
-    }));
+    };
+    setFormData(newFormData);
+    // 立即通知外部更新
+    onChange(newFormData);
+  };
+
+  // 统一更新函数
+  const updateFormData = (updates: Partial<ProductData>) => {
+    const newFormData = { ...formData, ...updates };
+    setFormData(newFormData);
+    onChange(newFormData);
   };
 
   const addSellingPoint = () => {
-    setFormData(prev => ({
-      ...prev,
-      sellingPoints: [...(prev.sellingPoints || []), '']
-    }));
+    const newSellingPoints = [...(formData.sellingPoints || []), ''];
+    updateFormData({ sellingPoints: newSellingPoints });
   };
 
   const removeSellingPoint = (index: number) => {
     if ((formData.sellingPoints || []).length > 1) {
       const newSellingPoints = (formData.sellingPoints || []).filter((_, i) => i !== index);
-      setFormData(prev => ({
-        ...prev,
-        sellingPoints: newSellingPoints
-      }));
+      updateFormData({ sellingPoints: newSellingPoints });
     }
   };
 
   const handleSpecChange = (key: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      specs: {
-        ...prev.specs,
-        [key]: value
-      }
-    }));
+    const newSpecs = {
+      ...(formData.specs || {}),
+      [key]: value
+    };
+    updateFormData({ specs: newSpecs });
   };
 
   const addSpec = () => {
     const key = `规格${Object.keys(formData.specs || {}).length + 1}`;
-    setFormData(prev => ({
-      ...prev,
-      specs: {
-        ...(prev.specs || {}),
-        [key]: ''
-      }
-    }));
+    const newSpecs = {
+      ...(formData.specs || {}),
+      [key]: ''
+    };
+    updateFormData({ specs: newSpecs });
   };
 
   const removeSpec = (key: string) => {
     const newSpecs = { ...(formData.specs || {}) };
     delete newSpecs[key];
-    setFormData(prev => ({
-      ...prev,
-      specs: newSpecs
-    }));
+    updateFormData({ specs: newSpecs });
   };
 
   const addCustomField = () => {
@@ -112,10 +114,7 @@ export default function ProductForm({
       }
     });
     
-    setFormData(prev => ({
-      ...prev,
-      customFields: customFieldsObj
-    }));
+    updateFormData({ customFields: customFieldsObj });
   };
 
   const removeCustomField = (index: number) => {
@@ -129,10 +128,7 @@ export default function ProductForm({
       }
     });
     
-    setFormData(prev => ({
-      ...prev,
-      customFields: customFieldsObj
-    }));
+    updateFormData({ customFields: customFieldsObj });
   };
 
   return (
@@ -241,7 +237,7 @@ export default function ProductForm({
                   if (e.target.value.trim()) {
                     const newSpecs = { ...(formData.specs || {}) };
                     newSpecs[e.target.value] = '';
-                    setFormData(prev => ({ ...prev, specs: newSpecs }));
+                    updateFormData({ specs: newSpecs });
                   }
                 }}
                 className="input w-20 text-sm"
@@ -257,7 +253,7 @@ export default function ProductForm({
                     const firstKey = Object.keys(newSpecs)[0];
                     if (firstKey) {
                       newSpecs[firstKey] = e.target.value;
-                      setFormData(prev => ({ ...prev, specs: newSpecs }));
+                      updateFormData({ specs: newSpecs });
                     }
                   }
                 }}
@@ -282,7 +278,7 @@ export default function ProductForm({
                   const newSpecs = { ...(formData.specs || {}) };
                   delete newSpecs[key];
                   newSpecs[e.target.value] = value;
-                  setFormData(prev => ({ ...prev, specs: newSpecs }));
+                  updateFormData({ specs: newSpecs });
                 }}
                 className="input w-20 text-sm"
                 placeholder="规格名"
