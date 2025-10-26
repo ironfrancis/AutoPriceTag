@@ -36,9 +36,7 @@ export default function LabelCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRendering, setIsRendering] = useState(false);
   const [simpleLayoutResult, setSimpleLayoutResult] = useState<SimpleLayoutResult | null>(null);
-  const [isDragging, setIsDragging] = useState(false); // 是否正在拖拽
   const [scale, setScale] = useState(1); // CSS缩放比例
 
   // mm转像素的转换函数
@@ -79,6 +77,7 @@ export default function LabelCanvas({
     };
   };
 
+  // 初始化Canvas（只在组件挂载时执行一次）
   useEffect(() => {
     // 确保只在客户端运行
     if (typeof window === 'undefined') return;
@@ -90,34 +89,18 @@ export default function LabelCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 计算限制后的显示尺寸
-    const limitedSize = calculateLimitedDisplaySize(labelSize.width, labelSize.height);
-    
-    const renderScale = 2; // 高DPI渲染
-    const canvasWidth = limitedSize.width * renderScale;
-    const canvasHeight = limitedSize.height * renderScale;
-    
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-    
-    // 设置显示尺寸（限制后的尺寸）
-    canvas.style.width = `${limitedSize.width}px`;
-    canvas.style.height = `${limitedSize.height}px`;
-
-    // 设置高DPI渲染
-    ctx.scale(renderScale, renderScale);
-
     setIsLoading(false);
 
     // 通知父组件画布已准备就绪
     if (onCanvasReady) {
       onCanvasReady(canvas);
     }
-  }, [labelSize, onCanvasReady]);
+  }, [onCanvasReady]);
 
-  // 单独处理画布尺寸变化
+  // 统一处理所有变化：尺寸、产品数据、字体配置
   useEffect(() => {
     if (!canvasRef.current || !labelSize || labelSize.width <= 0 || labelSize.height <= 0) return;
+    if (!productData) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -131,7 +114,14 @@ export default function LabelCanvas({
     const canvasHeight = limitedSize.height * renderScale;
     
     // 只在尺寸真正变化时才更新画布尺寸
-    if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+    const needsResize = canvas.width !== canvasWidth || canvas.height !== canvasHeight;
+    
+    if (needsResize) {
+      console.log('Canvas size changed, resizing:', {
+        oldSize: { width: canvas.width, height: canvas.height },
+        newSize: { width: canvasWidth, height: canvasHeight }
+      });
+      
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
       
@@ -141,17 +131,6 @@ export default function LabelCanvas({
 
       // 重新设置高DPI渲染
       ctx.scale(renderScale, renderScale);
-    }
-  }, [labelSize]);
-
-  // 当尺寸或产品数据变化时，重新计算布局和渲染
-  useEffect(() => {
-    if (!labelSize || !productData || !canvasRef.current || labelSize.width <= 0 || labelSize.height <= 0) return;
-
-    // 只在尺寸变化时显示渲染动画，内容变化时直接渲染
-    const isSizeChange = labelSize.width !== 0 && labelSize.height !== 0;
-    if (isSizeChange && !isExporting) {
-      setIsRendering(true);
     }
 
     try {
@@ -174,12 +153,12 @@ export default function LabelCanvas({
       } else {
         // 否则使用简单布局
         simpleResult = calculateSimpleLayout(
-        labelSize.width,
-        labelSize.height,
-        productData,
-        undefined,
-        textAreaRatio
-      );
+          labelSize.width,
+          labelSize.height,
+          productData,
+          undefined,
+          textAreaRatio
+        );
       }
 
       setSimpleLayoutResult(simpleResult);
@@ -189,27 +168,13 @@ export default function LabelCanvas({
         onLayoutChange(simpleResult);
       }
 
-      // 渲染到画布（导出时也要渲染）
-      // 使用真实尺寸进行渲染
+      // 直接渲染到画布，不显示加载动画（避免闪烁）
       renderSimpleLayoutToCanvas(simpleResult, labelSize, finalFontConfigs);
-
-      // 只在尺寸变化时延迟结束渲染状态
-      if (isSizeChange && !isExporting) {
-        setTimeout(() => setIsRendering(false), 100);
-      }
+      
     } catch (error) {
-      console.error('Simple layout calculation failed:', error);
-      setIsRendering(false);
+      console.error('Layout calculation or rendering failed:', error);
     }
-  }, [labelSize, productData, textAreaRatio, fontConfigs, templateId, templateConfig, onLayoutChange]); // 移除 isExporting 依赖
-
-  // 当简洁布局结果变化时，重新渲染画布（但不重新计算缩放）
-  useEffect(() => {
-    if (simpleLayoutResult && labelSize.width > 0 && labelSize.height > 0) {
-      // 只重新渲染内容，不重新计算缩放
-      renderSimpleLayoutToCanvas(simpleLayoutResult, labelSize, fontConfigs);
-    }
-  }, [simpleLayoutResult, labelSize, fontConfigs]);
+  }, [labelSize, productData, fontConfigs, textAreaRatio, templateId, templateConfig, onLayoutChange])
 
   // 监听容器尺寸变化，计算缩放比例
   useEffect(() => {
@@ -399,29 +364,7 @@ export default function LabelCanvas({
     // 使用极简背景
     drawMinimalistBackground(ctx, canvasSize.width, canvasSize.height);
 
-    // 绘制区域分割线（更微妙的线条）
-    const textAreaWidth = canvasSize.width * textAreaRatio;
-    ctx.strokeStyle = isDragging ? '#E5E7EB' : '#F3F4F6';
-    ctx.lineWidth = isDragging ? 1.5 : 0.5;
-    ctx.beginPath();
-    ctx.moveTo(textAreaWidth, 0);
-    ctx.lineTo(textAreaWidth, canvasSize.height);
-    ctx.stroke();
-    
-    // 绘制拖拽手柄（更优雅的设计）
-    if (isDragging) {
-      const handleY = canvasSize.height / 2;
-      const handleSize = 6;
-      
-      ctx.fillStyle = '#6B7280';
-      ctx.beginPath();
-      ctx.arc(textAreaWidth, handleY, handleSize, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+    // 不再绘制分割线（已改为统一垂直布局）
 
     // 渲染每个简洁元素（需要考虑Canvas的缩放比例）
     simpleResult.elements.forEach((element, index) => {
@@ -438,47 +381,7 @@ export default function LabelCanvas({
     });
   };
 
-  // 鼠标事件处理 - 使用真实像素尺寸
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // 使用真实像素尺寸
-    const realWidthPx = mmToPixels(labelSize.width);
-    const currentTextAreaRatio = textAreaRatio || 0.65;
-    const textAreaWidth = realWidthPx * currentTextAreaRatio;
-    
-    // 检查是否点击在分割线附近（10像素范围内）
-    if (Math.abs(x - textAreaWidth) <= 10 && y >= 0 && y <= mmToPixels(labelSize.height)) {
-      setIsDragging(true);
-      e.preventDefault();
-    }
-  };
-  
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    
-    // 注意：拖拽功能暂时保留，但需要通过props传递给外部
-    // const newRatio = Math.max(0.3, Math.min(0.8, x / realWidthPx));
-  };
-  
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-  
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
+  // 不再需要拖拽分割线功能（已改为统一垂直布局）
 
   // 为预览渲染简洁元素（极简风格）
   const renderSimpleElementForPreview = (
@@ -578,16 +481,6 @@ export default function LabelCanvas({
 
   return (
     <div ref={containerRef} className={`relative ${className}`} style={{ width: '100%', height: '100%' }}>
-      {/* 渲染状态指示器 */}
-      {isRendering && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg z-10">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-caption text-gray-600">正在排版文字...</p>
-          </div>
-        </div>
-      )}
-
       {/* 加载状态 */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-stone-100 rounded-lg">
@@ -610,17 +503,12 @@ export default function LabelCanvas({
             >
               <canvas
                 ref={canvasRef}
-                className="border-0 rounded-lg shadow-lg bg-white cursor-pointer"
+                className="border-0 rounded-lg shadow-lg bg-white"
                 style={{ 
                   width: 'auto', 
                   height: 'auto',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  cursor: isDragging ? 'col-resize' : 'pointer'
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                 }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
               />
             </div>
           ) : (
@@ -645,14 +533,8 @@ export default function LabelCanvas({
             {simpleLayoutResult && (
               <>
                 <span className="text-gray-400">•</span>
-                <span className="text-blue-600">
-                  文字: {Math.round((textAreaRatio || 0.65) * 100)}%
-                </span>
-                <span className="text-green-600">
-                  价格: {Math.round((1 - (textAreaRatio || 0.65)) * 100)}%
-                </span>
                 <span className="text-purple-600">
-                  {simpleLayoutResult.elements.length}个
+                  {simpleLayoutResult.elements.length}个元素
                 </span>
               </>
             )}

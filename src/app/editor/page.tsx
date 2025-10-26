@@ -197,6 +197,29 @@ export default function EditorPage() {
         canvasSize: { width: canvasInstance.width, height: canvasInstance.height }
       });
 
+      // 确保画布内容已完全渲染（增加等待时间确保渲染完成）
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // 验证Canvas内容
+      const ctx = canvasInstance.getContext('2d');
+      if (ctx) {
+        const imageData = ctx.getImageData(0, 0, canvasInstance.width, canvasInstance.height);
+        const hasContent = imageData.data.some((pixel: number, index: number) => {
+          // 检查非alpha通道的像素
+          return index % 4 !== 3 && pixel !== 0;
+        });
+        
+        console.log('Canvas content validation:', { 
+          hasContent, 
+          width: canvasInstance.width, 
+          height: canvasInstance.height 
+        });
+        
+        if (!hasContent) {
+          throw new Error('Canvas内容为空，请稍后重试');
+        }
+      }
+
       await exportManager.export({
         format,
         productName: productData.name || 'price_tag',
