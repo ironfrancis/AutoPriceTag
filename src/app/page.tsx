@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Palette, Download, Zap } from "lucide-react";
+import { ArrowRight, Palette, Download, Zap, Move } from "lucide-react";
 
 export default function Home() {
   return (
@@ -18,6 +18,9 @@ export default function Home() {
             <div className="flex items-center space-x-6">
               <Link href="/editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
                 智能编辑器
+              </Link>
+              <Link href="/draggable-editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
+                可拖拽编辑器
               </Link>
               <Link href="/cases" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
                 案例展示
@@ -78,7 +81,7 @@ export default function Home() {
             </p>
           </div>
           
-          <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {/* 智能设计 */}
             <div className="card p-8 text-center">
               <div className="mx-auto h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -89,6 +92,18 @@ export default function Home() {
                 预设多种精美模板，支持自定义样式，智能布局让设计变得简单
               </p>
             </div>
+
+            {/* 可拖拽编辑 - 新功能 */}
+            <Link href="/draggable-editor" className="card p-8 text-center hover:shadow-lg transition-all group">
+              <div className="mx-auto h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                <Move className="h-6 w-6 text-purple-600" />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900">可拖拽编辑</h3>
+              <p className="mt-2 text-gray-600">
+                拖动调整元素位置，自由布局，所见即所得的编辑体验
+              </p>
+              <span className="mt-2 inline-block text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✨ 新功能</span>
+            </Link>
 
             {/* 一键导出 */}
             <div className="card p-8 text-center">
