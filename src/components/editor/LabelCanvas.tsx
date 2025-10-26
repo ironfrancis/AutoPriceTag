@@ -3,26 +3,81 @@
 import { useState, useEffect, useRef } from 'react';
 import { ProductData } from '@/lib/types';
 import { calculateSimpleLayout, SimpleLayoutResult, LayoutElement } from '@/lib/layout/simpleLayout';
+import { FontConfig } from './FontCustomizer';
+import { TemplateConfig, getTemplateConfigById } from './TemplateConfig';
+import { TemplateRenderer } from './TemplateRenderer';
 
 interface LabelCanvasProps {
   labelSize: { width: number; height: number };
   productData: ProductData;
+  fontConfigs?: Record<string, FontConfig>;
   onCanvasReady?: (canvas: any) => void;
   className?: string;
+  isExporting?: boolean; // 添加导出状态
+  // 模板系统支持
+  templateId?: string; // 模板ID
+  templateConfig?: TemplateConfig; // 直接传入模板配置
+  textAreaRatio?: number; // 自定义比例
+  onLayoutChange?: (layout: SimpleLayoutResult) => void; // 布局变化回调
 }
 
 export default function LabelCanvas({ 
   labelSize, 
   productData, 
+  fontConfigs,
   onCanvasReady,
-  className = '' 
+  className = '',
+  isExporting = false,
+  templateId,
+  templateConfig,
+  textAreaRatio = 0.65,
+  onLayoutChange
 }: LabelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
   const [simpleLayoutResult, setSimpleLayoutResult] = useState<SimpleLayoutResult | null>(null);
-  const [textAreaRatio, setTextAreaRatio] = useState(0.65); // 文字区域比例
   const [isDragging, setIsDragging] = useState(false); // 是否正在拖拽
+  const [scale, setScale] = useState(1); // CSS缩放比例
+
+  // mm转像素的转换函数
+  const mmToPixels = (mm: number): number => {
+    return mm * 3.7795275591;
+  };
+
+  // 计算限制后的显示尺寸（避免极端尺寸）
+  const calculateLimitedDisplaySize = (widthMm: number, heightMm: number) => {
+    // 先转换为像素
+    const realWidthPx = mmToPixels(widthMm);
+    const realHeightPx = mmToPixels(heightMm);
+    
+    // 限制最大显示尺寸（防止极端长条形）
+    const MAX_DISPLAY_WIDTH = 2000;  // 最大2000px
+    const MAX_DISPLAY_HEIGHT = 1500; // 最大1500px
+    
+    let displayWidth = realWidthPx;
+    let displayHeight = realHeightPx;
+    
+    // 如果超过限制，等比缩小
+    if (displayWidth > MAX_DISPLAY_WIDTH) {
+      const scale = MAX_DISPLAY_WIDTH / displayWidth;
+      displayWidth = MAX_DISPLAY_WIDTH;
+      displayHeight = displayHeight * scale;
+    }
+    
+    if (displayHeight > MAX_DISPLAY_HEIGHT) {
+      const scale = MAX_DISPLAY_HEIGHT / displayHeight;
+      displayHeight = MAX_DISPLAY_HEIGHT;
+      displayWidth = displayWidth * scale;
+    }
+    
+    return { 
+      width: displayWidth, 
+      height: displayHeight,
+      scale: displayWidth / realWidthPx // 相对于原始尺寸的缩放比
+    };
+  };
 
   useEffect(() => {
     // 确保只在客户端运行
@@ -35,9 +90,22 @@ export default function LabelCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 设置画布尺寸
-    canvas.width = 600;
-    canvas.height = 450;
+    // 计算限制后的显示尺寸
+    const limitedSize = calculateLimitedDisplaySize(labelSize.width, labelSize.height);
+    
+    const renderScale = 2; // 高DPI渲染
+    const canvasWidth = limitedSize.width * renderScale;
+    const canvasHeight = limitedSize.height * renderScale;
+    
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    
+    // 设置显示尺寸（限制后的尺寸）
+    canvas.style.width = `${limitedSize.width}px`;
+    canvas.style.height = `${limitedSize.height}px`;
+
+    // 设置高DPI渲染
+    ctx.scale(renderScale, renderScale);
 
     setIsLoading(false);
 
@@ -45,7 +113,36 @@ export default function LabelCanvas({
     if (onCanvasReady) {
       onCanvasReady(canvas);
     }
-  }, [onCanvasReady]);
+  }, [labelSize, onCanvasReady]);
+
+  // 单独处理画布尺寸变化
+  useEffect(() => {
+    if (!canvasRef.current || !labelSize || labelSize.width <= 0 || labelSize.height <= 0) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 计算限制后的显示尺寸
+    const limitedSize = calculateLimitedDisplaySize(labelSize.width, labelSize.height);
+    
+    const renderScale = 2;
+    const canvasWidth = limitedSize.width * renderScale;
+    const canvasHeight = limitedSize.height * renderScale;
+    
+    // 只在尺寸真正变化时才更新画布尺寸
+    if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      
+      // 设置显示尺寸（限制后的尺寸）
+      canvas.style.width = `${limitedSize.width}px`;
+      canvas.style.height = `${limitedSize.height}px`;
+
+      // 重新设置高DPI渲染
+      ctx.scale(renderScale, renderScale);
+    }
+  }, [labelSize]);
 
   // 当尺寸或产品数据变化时，重新计算布局和渲染
   useEffect(() => {
@@ -53,45 +150,123 @@ export default function LabelCanvas({
 
     // 只在尺寸变化时显示渲染动画，内容变化时直接渲染
     const isSizeChange = labelSize.width !== 0 && labelSize.height !== 0;
-    if (isSizeChange) {
+    if (isSizeChange && !isExporting) {
       setIsRendering(true);
     }
 
     try {
-      // 计算简洁布局（使用当前的分割比例）
-      const simpleResult = calculateSimpleLayout(
+      let simpleResult: SimpleLayoutResult;
+      let finalFontConfigs = fontConfigs;
+
+      // 检查是否使用模板
+      let activeTemplate: TemplateConfig | undefined;
+      if (templateConfig) {
+        activeTemplate = templateConfig;
+      } else if (templateId) {
+        activeTemplate = getTemplateConfigById(templateId);
+      }
+
+      // 如果使用模板，使用模板渲染器
+      if (activeTemplate) {
+        const renderer = new TemplateRenderer(activeTemplate, labelSize, productData, fontConfigs);
+        simpleResult = renderer.render();
+        finalFontConfigs = renderer.getMergedFontConfigs();
+      } else {
+        // 否则使用简单布局
+        simpleResult = calculateSimpleLayout(
         labelSize.width,
         labelSize.height,
         productData,
         undefined,
         textAreaRatio
       );
+      }
 
       setSimpleLayoutResult(simpleResult);
 
-      // 渲染到画布
-      renderSimpleLayoutToCanvas(simpleResult, labelSize);
+      // 通知外部布局变化
+      if (onLayoutChange) {
+        onLayoutChange(simpleResult);
+      }
+
+      // 渲染到画布（导出时也要渲染）
+      // 使用真实尺寸进行渲染
+      renderSimpleLayoutToCanvas(simpleResult, labelSize, finalFontConfigs);
 
       // 只在尺寸变化时延迟结束渲染状态
-      if (isSizeChange) {
+      if (isSizeChange && !isExporting) {
         setTimeout(() => setIsRendering(false), 100);
       }
     } catch (error) {
       console.error('Simple layout calculation failed:', error);
       setIsRendering(false);
     }
-  }, [labelSize, productData, textAreaRatio]); // 添加 textAreaRatio 依赖
+  }, [labelSize, productData, textAreaRatio, fontConfigs, templateId, templateConfig, onLayoutChange]); // 移除 isExporting 依赖
 
   // 当简洁布局结果变化时，重新渲染画布（但不重新计算缩放）
   useEffect(() => {
     if (simpleLayoutResult && labelSize.width > 0 && labelSize.height > 0) {
       // 只重新渲染内容，不重新计算缩放
-      renderSimpleLayoutToCanvas(simpleLayoutResult, labelSize);
+      renderSimpleLayoutToCanvas(simpleLayoutResult, labelSize, fontConfigs);
     }
-  }, [simpleLayoutResult]);
+  }, [simpleLayoutResult, labelSize, fontConfigs]);
 
-  // 移除窗口大小变化监听，使用固定预览尺寸
-  // 不再监听窗口大小变化，保持预览区域大小稳定
+  // 监听容器尺寸变化，计算缩放比例
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+
+    const updateScale = () => {
+      const containerRect = container.getBoundingClientRect();
+      const containerWidth = containerRect.width;
+      const containerHeight = containerRect.height;
+      
+      // 获取Canvas的实际显示尺寸（CSS尺寸，不是内部像素）
+      const canvasDisplayWidth = parseFloat(canvas.style.width) || 500;
+      const canvasDisplayHeight = parseFloat(canvas.style.height) || 350;
+      
+      // 计算缩放比例（留3%边距，最大化利用空间）
+      const edgePadding = 0.03; // 减少边距到3%
+      const scaleX = (containerWidth * (1 - edgePadding * 2)) / canvasDisplayWidth;
+      const scaleY = (containerHeight * (1 - edgePadding * 2)) / canvasDisplayHeight;
+      
+      // 取较小的值，确保不超出容器
+      const calculatedScale = Math.min(scaleX, scaleY);
+      
+      // 限制缩放范围：最小0.5倍，最大3.0倍（允许更大的放大）
+      const finalScale = Math.max(0.5, Math.min(calculatedScale, 3.0));
+      
+      console.log('Scale calculation:', {
+        containerWidth,
+        containerHeight,
+        canvasDisplayWidth,
+        canvasDisplayHeight,
+        calculatedScale,
+        finalScale
+      });
+      
+      setScale(finalScale);
+    };
+    
+    // 初始计算
+    updateScale();
+    
+    // 监听resize事件
+    const resizeObserver = new ResizeObserver(entries => {
+      updateScale();
+    });
+    
+    resizeObserver.observe(container);
+    
+    // 也监听window resize（作为备用）
+    window.addEventListener('resize', updateScale);
+    
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateScale);
+    };
+  }, [labelSize]); // 添加labelSize依赖，当标签尺寸变化时重新计算
 
   // 计算基于宽高比的固定预览尺寸
   const calculatePreviewSizeByRatio = (
@@ -151,102 +326,216 @@ export default function LabelCanvas({
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
   };
 
+  // 绘制极简风格的背景
+  const drawMinimalistBackground = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number
+  ) => {
+    // 绘制纯净白色背景
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width, height);
+    
+    // 绘制微妙的边框 - 极简风格的细线
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+    
+    // 添加微妙的圆角效果（通过绘制四个角的弧线）
+    const cornerRadius = 2;
+    
+    // 绘制圆角矩形
+    ctx.beginPath();
+    ctx.moveTo(cornerRadius, 0);
+    ctx.lineTo(width - cornerRadius, 0);
+    ctx.quadraticCurveTo(width, 0, width, cornerRadius);
+    ctx.lineTo(width, height - cornerRadius);
+    ctx.quadraticCurveTo(width, height, width - cornerRadius, height);
+    ctx.lineTo(cornerRadius, height);
+    ctx.quadraticCurveTo(0, height, 0, height - cornerRadius);
+    ctx.lineTo(0, cornerRadius);
+    ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 绘制边框
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  };
+
   // 简洁渲染到画布
-  const renderSimpleLayoutToCanvas = (simpleResult: SimpleLayoutResult, size: { width: number; height: number }) => {
+  const renderSimpleLayoutToCanvas = (simpleResult: SimpleLayoutResult, size: { width: number; height: number }, fontConfigs?: Record<string, FontConfig>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 使用基于宽高比的固定预览尺寸
-    const previewSize = calculatePreviewSizeByRatio(size.width, size.height);
+    // 计算限制后的显示尺寸
+    const limitedSize = calculateLimitedDisplaySize(size.width, size.height);
     
-    // 设置画布尺寸
-    const renderScale = 2; // 渲染质量缩放
-    const canvasWidth = previewSize.width * renderScale;
-    const canvasHeight = previewSize.height * renderScale;
+    // 获取真实像素尺寸（用于计算布局）
+    const realWidthPx = mmToPixels(size.width);
+    const realHeightPx = mmToPixels(size.height);
     
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-    
-    // 设置显示尺寸（使用预览尺寸）
-    canvas.style.width = `${previewSize.width}px`;
-    canvas.style.height = `${previewSize.height}px`;
+    // 但是用限制后的尺寸来绘制Canvas
+    const canvasSize = { width: limitedSize.width, height: limitedSize.height };
 
-    // 设置高DPI渲染
-    ctx.scale(renderScale, renderScale);
-
+    console.log('Rendering to canvas:', {
+      canvasSize: { width: canvas.width, height: canvas.height },
+      canvasDisplaySize: { width: canvas.style.width, height: canvas.style.height },
+      labelSize: size,
+      realSizePx: { width: realWidthPx, height: realHeightPx },
+      limitedSize: canvasSize,
+      scaleFactor: limitedSize.scale,
+      elementsCount: simpleResult.elements.length,
+      elements: simpleResult.elements
+    });
+    
     // 清空画布
-    ctx.clearRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 设置简洁背景
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
+    // 使用极简背景
+    drawMinimalistBackground(ctx, canvasSize.width, canvasSize.height);
 
-    // 绘制区域分割线（可拖拽）
-    const textAreaWidth = previewSize.width * textAreaRatio;
-    ctx.strokeStyle = isDragging ? '#3B82F6' : '#E5E7EB'; // 拖拽时变蓝色
-    ctx.lineWidth = isDragging ? 2 : 1;
+    // 绘制区域分割线（更微妙的线条）
+    const textAreaWidth = canvasSize.width * textAreaRatio;
+    ctx.strokeStyle = isDragging ? '#E5E7EB' : '#F3F4F6';
+    ctx.lineWidth = isDragging ? 1.5 : 0.5;
     ctx.beginPath();
     ctx.moveTo(textAreaWidth, 0);
-    ctx.lineTo(textAreaWidth, previewSize.height);
+    ctx.lineTo(textAreaWidth, canvasSize.height);
     ctx.stroke();
     
-    // 绘制拖拽手柄
+    // 绘制拖拽手柄（更优雅的设计）
     if (isDragging) {
-      const handleY = previewSize.height / 2;
-      const handleSize = 8;
+      const handleY = canvasSize.height / 2;
+      const handleSize = 6;
       
-      // 绘制圆形手柄
-      ctx.fillStyle = '#3B82F6';
+      ctx.fillStyle = '#6B7280';
       ctx.beginPath();
       ctx.arc(textAreaWidth, handleY, handleSize, 0, 2 * Math.PI);
       ctx.fill();
       
-      // 绘制手柄边框
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
 
-    // 渲染每个简洁元素
-    simpleResult.elements.forEach(element => {
-      renderSimpleElementForPreview(ctx, element, previewSize, size);
+    // 渲染每个简洁元素（需要考虑Canvas的缩放比例）
+    simpleResult.elements.forEach((element, index) => {
+      console.log(`Rendering element ${index}:`, {
+        id: element.id,
+        text: element.text,
+        fontSize: element.fontSize,
+        position: { x: element.x, y: element.y },
+        canvasSize,
+        labelSizeMm: size,
+        scaleFactor: limitedSize.scale
+      });
+      renderSimpleElementForPreview(ctx, element, canvasSize, size, fontConfigs, limitedSize.scale);
     });
-
-    // 绘制优雅的视觉分界效果
-    drawElegantDivider(ctx, previewSize.width, previewSize.height);
   };
 
-  // 为预览渲染简洁元素
+  // 鼠标事件处理 - 使用真实像素尺寸
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // 使用真实像素尺寸
+    const realWidthPx = mmToPixels(labelSize.width);
+    const currentTextAreaRatio = textAreaRatio || 0.65;
+    const textAreaWidth = realWidthPx * currentTextAreaRatio;
+    
+    // 检查是否点击在分割线附近（10像素范围内）
+    if (Math.abs(x - textAreaWidth) <= 10 && y >= 0 && y <= mmToPixels(labelSize.height)) {
+      setIsDragging(true);
+      e.preventDefault();
+    }
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    
+    // 注意：拖拽功能暂时保留，但需要通过props传递给外部
+    // const newRatio = Math.max(0.3, Math.min(0.8, x / realWidthPx));
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+  
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  // 为预览渲染简洁元素（极简风格）
   const renderSimpleElementForPreview = (
     ctx: CanvasRenderingContext2D, 
     element: any, // SimpleLayoutElement
-    previewSize: { width: number; height: number },
-    realSize: { width: number; height: number }
+    canvasSize: { width: number; height: number },
+    labelSizeMm: { width: number; height: number },
+    fontConfigs?: Record<string, FontConfig>,
+    scaleFactor: number = 1 // Canvas的缩放比例
   ) => {
-    if (!element.text) return;
-
-    // 计算预览尺寸与真实尺寸的比例
-    const scale = Math.min(previewSize.width / mmToPixels(realSize.width), previewSize.height / mmToPixels(realSize.height));
-
-    // 设置字体（按比例缩放）
-    const scaledFontSize = element.fontSize * scale;
-    ctx.font = `${scaledFontSize}px "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif`;
-    
-    // 根据区域设置颜色
-    if (element.area === 'price') {
-      ctx.fillStyle = '#1E88E5'; // 价格用蓝色
-    } else {
-      ctx.fillStyle = '#000000'; // 文字用黑色
+    if (!element.text) {
+      console.log(`Element ${element.id} has no text, skipping`);
+      return;
     }
+
+    console.log(`Rendering text for ${element.id}:`, {
+      text: element.text,
+      fontSize: element.fontSize,
+      position: { x: element.x, y: element.y },
+      canvasSize,
+      labelSizeMm
+    });
+
+    // 元素的位置已经是像素单位（来自layout计算）
+    // 需要考虑Canvas的缩放比例
+    const scale = scaleFactor; // Canvas的缩放比例
+
+    // 获取字体配置
+    const fontConfig = fontConfigs?.[element.id] || {
+      fontSize: element.fontSize,
+      fontWeight: 400,
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#111827',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    };
+
+    // 设置字体（考虑Canvas缩放）
+    const scaledFontSize = fontConfig.fontSize * scale;
+    const fontWeight = fontConfig.fontWeight;
+    const fontStyle = fontConfig.fontStyle;
+    const fontFamily = fontConfig.fontFamily;
     
+    ctx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px ${fontFamily}`;
+    ctx.fillStyle = fontConfig.color;
+    ctx.textAlign = fontConfig.textAlign as CanvasTextAlign;
     ctx.textBaseline = 'top';
+
+    console.log(`Font settings:`, {
+      font: ctx.font,
+      fillStyle: ctx.fillStyle,
+      textAlign: ctx.textAlign
+    });
 
     // 处理多行文本
     const lines = element.text.split('\n');
-    const lineHeight = scaledFontSize * 1.2;
+    const lineHeight = scaledFontSize * 1.4; // 使用更大的行高
 
     lines.forEach((line: string, index: number) => {
       // 按比例调整位置
@@ -263,187 +552,32 @@ export default function LabelCanvas({
         x = scaledX + element.width * scale - textWidth;
       }
 
-      // 确保文本在预览区域内
+      // 确保文本在Canvas区域内
       const textWidth = ctx.measureText(line).width;
-      if (x >= 0 && x + textWidth <= previewSize.width && 
-          scaledY >= 0 && scaledY + scaledFontSize <= previewSize.height) {
+      console.log(`Drawing line ${index}:`, {
+        line,
+        position: { x, y: scaledY },
+        textWidth,
+        scaledFontSize,
+        canvasSize,
+        inBounds: x >= 0 && x + textWidth <= canvasSize.width && 
+                  scaledY >= 0 && scaledY + scaledFontSize <= canvasSize.height
+      });
+      
+      if (x >= 0 && x + textWidth <= canvasSize.width && 
+          scaledY >= 0 && scaledY + scaledFontSize <= canvasSize.height) {
         ctx.fillText(line, x, scaledY);
+        console.log(`Text drawn successfully`);
+      } else {
+        console.log(`Text out of bounds, not drawn`);
       }
     });
   };
 
-  // 为预览渲染单个元素（基于比例调整）
-  const renderElementForPreview = (
-    ctx: CanvasRenderingContext2D, 
-    element: LayoutElement, 
-    previewSize: { width: number; height: number },
-    realSize: { width: number; height: number }
-  ) => {
-    if (!element.text) return;
 
-    // 计算预览尺寸与真实尺寸的比例（使用相同的缩放比例确保一致性）
-    const scale = Math.min(previewSize.width / mmToPixels(realSize.width), previewSize.height / mmToPixels(realSize.height));
-
-    // 设置字体（按比例缩放）
-    const scaledFontSize = element.fontSize * scale;
-    ctx.font = `${scaledFontSize}px "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif`;
-    ctx.fillStyle = '#000000';
-    ctx.textBaseline = 'top';
-
-    // 处理多行文本
-    const lines = element.text.split('\n');
-    const lineHeight = scaledFontSize * 1.2;
-
-    lines.forEach((line, index) => {
-      // 按比例调整位置（使用相同的缩放比例）
-      const scaledX = element.x * scale;
-      const scaledY = element.y * scale + index * lineHeight;
-      
-      // 处理文本对齐
-      let x = scaledX;
-      if (element.align === 'center') {
-        const textWidth = ctx.measureText(line).width;
-        x = previewSize.width / 2 - textWidth / 2; // 相对于预览区域中心对齐
-      } else if (element.align === 'right') {
-        const textWidth = ctx.measureText(line).width;
-        x = previewSize.width - textWidth - (element.x * scale); // 右对齐
-      }
-
-      // 确保文本在预览区域内
-      const textWidth = ctx.measureText(line).width;
-      if (x >= 0 && x + textWidth <= previewSize.width && 
-          scaledY >= 0 && scaledY + scaledFontSize <= previewSize.height) {
-        ctx.fillText(line, x, scaledY);
-      }
-    });
-  };
-
-  // 渲染到画布（使用固定比例预览）
-  const renderToCanvas = (elements: LayoutElement[], size: { width: number; height: number }) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // 使用基于宽高比的固定预览尺寸
-    const previewSize = calculatePreviewSizeByRatio(size.width, size.height);
-    
-    // 设置画布尺寸
-    const renderScale = 2; // 渲染质量缩放
-    const canvasWidth = previewSize.width * renderScale;
-    const canvasHeight = previewSize.height * renderScale;
-    
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-    
-    // 设置显示尺寸（使用预览尺寸）
-    canvas.style.width = `${previewSize.width}px`;
-    canvas.style.height = `${previewSize.height}px`;
-
-    // 设置高DPI渲染
-    ctx.scale(renderScale, renderScale);
-
-    // 清空画布
-    ctx.clearRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
-
-    // 设置背景
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvasWidth / renderScale, canvasHeight / renderScale);
-
-    // 渲染每个元素（使用预览尺寸进行布局计算）
-    elements.forEach(element => {
-      renderElementForPreview(ctx, element, previewSize, size);
-    });
-
-    // 绘制优雅的视觉分界效果
-    drawElegantDivider(ctx, previewSize.width, previewSize.height);
-  };
-
-  // 渲染单个元素
-  const renderElement = (ctx: CanvasRenderingContext2D, element: LayoutElement) => {
-    if (!element.text) return;
-
-    // 设置字体
-    ctx.font = `${element.fontSize}px "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif`;
-    ctx.fillStyle = '#000000';
-    ctx.textBaseline = 'top';
-
-    // 处理多行文本
-    const lines = element.text.split('\n');
-    const lineHeight = element.fontSize * 1.2;
-
-    lines.forEach((line, index) => {
-      let x = element.x;
-      
-      // 根据对齐方式调整x坐标
-      if (element.align === 'center') {
-        const textWidth = ctx.measureText(line).width;
-        x = element.x + (element.width - textWidth) / 2;
-      } else if (element.align === 'right') {
-        const textWidth = ctx.measureText(line).width;
-        x = element.x + element.width - textWidth;
-      }
-
-      const y = element.y + index * lineHeight;
-      
-      // 绘制文本
-      ctx.fillText(line, x, y);
-    });
-  };
-
-  // 鼠标事件处理
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // 计算预览尺寸
-    const previewSize = calculatePreviewSizeByRatio(labelSize.width, labelSize.height);
-    const textAreaWidth = previewSize.width * textAreaRatio;
-    
-    // 检查是否点击在分割线附近（10像素范围内）
-    if (Math.abs(x - textAreaWidth) <= 10 && y >= 0 && y <= previewSize.height) {
-      setIsDragging(true);
-      e.preventDefault();
-    }
-  };
-  
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    
-    // 计算预览尺寸
-    const previewSize = calculatePreviewSizeByRatio(labelSize.width, labelSize.height);
-    
-    // 计算新的比例（限制在 0.3 到 0.8 之间）
-    const newRatio = Math.max(0.3, Math.min(0.8, x / previewSize.width));
-    setTextAreaRatio(newRatio);
-  };
-  
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-  
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
-
-  // mm转像素
-  const mmToPixels = (mm: number): number => {
-    return mm * 3.7795275591;
-  };
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`} style={{ width: '100%', height: '100%' }}>
       {/* 渲染状态指示器 */}
       {isRendering && (
         <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg z-10">
@@ -464,10 +598,16 @@ export default function LabelCanvas({
         </div>
       )}
       
-      <div className="h-full flex flex-col">
-        <div className="flex-1 flex items-center justify-center min-h-0">
+      <div className="h-full flex flex-col" style={{ position: 'relative', width: '100%', height: '100%', paddingBottom: '32px' }}>
+        <div className="flex-1 flex items-center justify-center min-h-0 mb-1">
           {labelSize.width > 0 && labelSize.height > 0 ? (
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div 
+              className="relative"
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: 'center'
+              }}
+            >
               <canvas
                 ref={canvasRef}
                 className="border-0 rounded-lg shadow-lg bg-white cursor-pointer"
@@ -493,33 +633,36 @@ export default function LabelCanvas({
           )}
         </div>
         
-        {/* 布局信息 */}
-        {simpleLayoutResult && (
-          <div className="mt-2 text-center text-caption text-gray-500 bg-white rounded px-2 py-1">
-            <div className="flex items-center justify-center space-x-2">
-              <span className="font-medium text-blue-600">
-                文字区: {Math.round(textAreaRatio * 100)}%
-              </span>
-              <span className="mx-1">•</span>
-              <span className="text-green-600">
-                价格区: {Math.round((1 - textAreaRatio) * 100)}%
-              </span>
-              <span className="mx-1">•</span>
-              <span className="text-purple-600">
-                {simpleLayoutResult.elements.length} 个元素
-              </span>
-            </div>
-            <div className="mt-1 text-xs text-gray-400">
-              拖拽分割线调整比例
-            </div>
+        {/* 底部信息栏 - 单行显示所有信息 */}
+        <div className="absolute bottom-0 left-0 right-0 px-3 pb-2">
+          <div className="flex items-center justify-center gap-x-3 text-xs bg-white rounded px-3 py-1">
+            {/* 标签尺寸 */}
+            <span className="font-medium text-gray-700">
+              {labelSize.width > 0 && labelSize.height > 0 ? `${labelSize.width}×${labelSize.height}mm` : '未设置尺寸'}
+            </span>
+            
+            {/* 布局信息 */}
+            {simpleLayoutResult && (
+              <>
+                <span className="text-gray-400">•</span>
+                <span className="text-blue-600">
+                  文字: {Math.round((textAreaRatio || 0.65) * 100)}%
+                </span>
+                <span className="text-green-600">
+                  价格: {Math.round((1 - (textAreaRatio || 0.65)) * 100)}%
+                </span>
+                <span className="text-purple-600">
+                  {simpleLayoutResult.elements.length}个
+                </span>
+              </>
+            )}
+            
+            {/* 缩放信息 */}
+            <span className="text-gray-400">•</span>
+            <span className="text-orange-600">
+              缩放 {Math.round(scale * 100)}%
+            </span>
           </div>
-        )}
-        
-        {/* 尺寸信息 */}
-        <div className="mt-2 text-center text-caption text-gray-500 bg-white rounded px-2 py-1">
-          <span className="font-medium">
-            {labelSize.width > 0 && labelSize.height > 0 ? `${labelSize.width}×${labelSize.height}mm` : '未设置'}
-          </span>
         </div>
       </div>
     </div>
