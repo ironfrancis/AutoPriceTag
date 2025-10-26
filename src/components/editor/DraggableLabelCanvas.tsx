@@ -1,8 +1,6 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Text, Rect, Group } from 'react-konva';
-import { KonvaEventObject } from 'konva/lib/Node';
 import { ProductData } from '@/lib/types';
 import { calculateSimpleLayout, SimpleLayoutResult } from '@/lib/layout/simpleLayout';
 import { FontConfig } from './FontCustomizer';
@@ -47,6 +45,22 @@ export default function DraggableLabelCanvas({
   const [scale, setScale] = useState(1);
   const [elements, setElements] = useState<DraggableElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [KonvaComponents, setKonvaComponents] = useState<any>(null);
+
+  // 动态加载 Konva 组件（只在客户端）
+  useEffect(() => {
+    import('react-konva').then((module) => {
+      setKonvaComponents({
+        Stage: module.Stage,
+        Layer: module.Layer,
+        Text: module.Text,
+        Rect: module.Rect,
+        Group: module.Group,
+      });
+      setIsClient(true);
+    });
+  }, []);
 
   // mm转像素
   const mmToPixels = (mm: number): number => {
@@ -160,7 +174,7 @@ export default function DraggableLabelCanvas({
   const displaySize = calculateDisplaySize(labelSize.width, labelSize.height);
 
   // 处理元素拖拽
-  const handleDragEnd = (id: string) => (e: KonvaEventObject<DragEvent>) => {
+  const handleDragEnd = (id: string) => (e: any) => {
     const node = e.target;
     const newX = node.x();
     const newY = node.y();
@@ -188,7 +202,7 @@ export default function DraggableLabelCanvas({
   };
 
   // 点击背景取消选择
-  const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
+  const handleStageClick = (e: any) => {
     if (e.target === e.target.getStage()) {
       setSelectedId(null);
       setElements(prev => prev.map(el => ({ ...el, selected: false })));
@@ -211,6 +225,26 @@ export default function DraggableLabelCanvas({
       stageRef.current.getExportCanvas = exportAsCanvas;
     }
   }, []);
+
+  // 如果不在客户端或Konva组件未加载，显示加载状态
+  if (!isClient || !KonvaComponents) {
+    return (
+      <div 
+        ref={containerRef} 
+        className={`relative ${className}`} 
+        style={{ width: '100%', height: '100%' }}
+      >
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">正在加载画布...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { Stage, Layer, Text, Rect, Group } = KonvaComponents;
 
   return (
     <div 
@@ -276,7 +310,7 @@ export default function DraggableLabelCanvas({
                     draggable={element.draggable}
                     onClick={handleSelect(element.id)}
                     onDragEnd={handleDragEnd(element.id)}
-                    onMouseEnter={(e) => {
+                    onMouseEnter={(e: any) => {
                       if (editable) {
                         const container = e.target.getStage()?.container();
                         if (container) {
@@ -284,7 +318,7 @@ export default function DraggableLabelCanvas({
                         }
                       }
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={(e: any) => {
                       const container = e.target.getStage()?.container();
                       if (container) {
                         container.style.cursor = 'default';
