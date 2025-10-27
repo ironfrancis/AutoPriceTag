@@ -16,11 +16,8 @@ export default function Home() {
             </Link>
             
             <div className="flex items-center space-x-6">
-              <Link href="/editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
-                智能编辑器
-              </Link>
               <Link href="/draggable-editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
-                可拖拽编辑器
+                标签编辑器
               </Link>
               <Link href="/cases" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
                 案例展示
@@ -29,7 +26,7 @@ export default function Home() {
                 文档
               </Link>
               <Link
-                href="/editor"
+                href="/draggable-editor"
                 className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
               >
                 开始设计
@@ -52,7 +49,7 @@ export default function Home() {
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link
-                href="/editor"
+                href="/draggable-editor"
                 className="btn btn-primary px-8 py-3 text-lg"
               >
                 立即开始
@@ -142,7 +139,7 @@ export default function Home() {
             </p>
             <div className="mt-6">
               <Link
-                href="/editor"
+                href="/draggable-editor"
                 className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
               >
                 立即创建标签
@@ -215,7 +212,7 @@ export default function Home() {
             </p>
             <div className="mt-8">
               <Link
-                href="/editor"
+                href="/draggable-editor"
                 className="btn bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg"
               >
                 开始设计

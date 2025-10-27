@@ -562,11 +562,11 @@ export default function DraggableEditorPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Link
-                href="/editor"
+                href="/"
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span className="text-sm font-medium">返回标准编辑器</span>
+                <span className="text-sm font-medium">返回首页</span>
               </Link>
               <div className="h-6 w-px bg-stone-300"></div>
               <div className="flex items-center space-x-2">
