@@ -120,7 +120,7 @@ export default function PageLayoutPage() {
     scale: number
   ) => {
     const { labelDesign } = instance;
-    const { labelSize, productData } = labelDesign;
+    const { labelSize, layout, fontConfigs, elementStyles } = labelDesign;
     
     // 标签尺寸（像素）
     const labelWidth = labelSize.width * mmToPx * scale;
@@ -140,81 +140,70 @@ export default function PageLayoutPage() {
     ctx.lineWidth = 1 * scale;
     ctx.strokeRect(0, 0, labelWidth, labelHeight);
     
-    // 计算字体大小和行高
-    const baseFontSize = 16 * scale;
-    const lineHeight = 1.4;
+    // 获取元素样式配置（优先elementStyles，否则用fontConfigs）
+    const styles = elementStyles || fontConfigs;
     
-    // 设置默认样式
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#000000';
-    
-    let currentY = 8 * scale; // 内边距
-    
-    // 绘制商品名称
-    if (productData.name) {
-      ctx.font = `${baseFontSize * 1.2}px system-ui, sans-serif`;
-      ctx.textAlign = 'left';
-      const lines = productData.name.split('\n');
-      lines.forEach(line => {
-        if (line.trim()) {
-          ctx.fillText(line, 4 * scale, currentY);
-          currentY += baseFontSize * lineHeight;
-        }
-      });
-    }
-    
-    // 绘制品牌
-    if (productData.brand) {
-      currentY += 4 * scale;
-      ctx.font = `${baseFontSize * 0.8}px system-ui, sans-serif`;
-      ctx.fillStyle = '#6B7280';
-      ctx.fillText(productData.brand, 4 * scale, currentY);
-      currentY += baseFontSize * lineHeight;
-    }
-    
-    // 绘制价格
-    if (productData.price > 0) {
-      currentY += 6 * scale;
-      ctx.font = `bold ${baseFontSize * 1.5}px system-ui, sans-serif`;
-      ctx.fillStyle = '#2563eb';
-      ctx.textAlign = 'center';
-      ctx.fillText(`¥${productData.price.toFixed(2)}`, labelWidth / 2, currentY);
-      currentY += baseFontSize * lineHeight * 1.5;
-    }
-    
-    // 绘制卖点
-    if (productData.sellingPoints && productData.sellingPoints.length > 0) {
-      currentY += 6 * scale;
-      ctx.font = `${baseFontSize * 0.7}px system-ui, sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#4B5563';
-      for (const point of productData.sellingPoints) {
-        if (point && point.trim()) {
-          ctx.fillText(`• ${point}`, 4 * scale, currentY);
-          currentY += baseFontSize * lineHeight * 0.8;
-          if (currentY > labelHeight - 10 * scale) break; // 防止超出
-        }
+    // 如果没有保存的布局，使用硬编码渲染作为后备
+    if (!layout || !layout.elements || layout.elements.length === 0) {
+      // 使用默认渲染（向后兼容）
+      const { productData } = labelDesign;
+      const defaultFontSize = 16 * scale;
+      let currentY = 8 * scale;
+      
+      if (productData.name) {
+        ctx.font = `${defaultFontSize * 1.2}px system-ui, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#000000';
+        ctx.fillText(productData.name, 4 * scale, currentY);
+        currentY += defaultFontSize * 1.4;
       }
-    }
-    
-    // 绘制规格
-    if (productData.specs && Object.keys(productData.specs).length > 0) {
-      ctx.font = `${baseFontSize * 0.7}px system-ui, sans-serif`;
-      ctx.fillStyle = '#6B7280';
-      let specText = '';
-      for (const [key, value] of Object.entries(productData.specs)) {
-        if (value) specText += `${key}: ${value}; `;
+      
+      if (productData.price > 0) {
+        ctx.font = `bold ${defaultFontSize * 1.5}px system-ui, sans-serif`;
+        ctx.fillStyle = '#2563eb';
+        ctx.textAlign = 'center';
+        ctx.fillText(`¥${productData.price.toFixed(2)}`, labelWidth / 2, currentY);
       }
-      if (specText && currentY < labelHeight - 20 * scale) {
-        // 处理文本换行
-        const words = specText.slice(0, -2).split('; ');
-        for (const word of words) {
-          if (currentY < labelHeight - 10 * scale) {
-            ctx.fillText(word, 4 * scale, currentY);
-            currentY += baseFontSize * lineHeight * 0.7;
-          } else {
-            break;
-          }
+    } else {
+      // 使用保存的布局数据渲染
+      const elements = layout.elements.filter(el => el.visible !== false);
+      
+      for (const element of elements) {
+        // 获取该元素的样式配置
+        const styleConfig = styles?.[element.id];
+        
+        if (!styleConfig) {
+          console.warn(`No style config for element ${element.id}`);
+          continue;
+        }
+        
+        // 计算元素位置（从百分比转为像素）
+        const x = (element.x / 100) * labelWidth;
+        const y = (element.y / 100) * labelHeight;
+        
+        // 设置字体样式
+        const fontSize = styleConfig.fontSize * scale;
+        const fontWeight = styleConfig.fontWeight || 400;
+        const fontStyle = styleConfig.fontStyle || 'normal';
+        const fontFamily = styleConfig.fontFamily || 'system-ui, -apple-system, sans-serif';
+        
+        ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = styleConfig.color || '#000000';
+        ctx.textAlign = (styleConfig.textAlign || 'left') as CanvasTextAlign;
+        ctx.textBaseline = 'top';
+        
+        // 处理多行文本
+        const lines = element.text.split('\n');
+        // lineHeight存在于ElementStyleConfig中，FontConfig中没有，需要兼容处理
+        const lineHeightMultiplier = ('lineHeight' in styleConfig ? (styleConfig.lineHeight as number) : 1.4);
+        const lineHeight = lineHeightMultiplier * fontSize;
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const textY = y + i * lineHeight;
+          
+          // 绘制文本（ctx.textAlign已经在上面设置好了）
+          ctx.fillText(line, x, textY);
         }
       }
     }
