@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, Grid, Layout, Trash2 } from 'lucide-react';
-import { PlacedLabelInstance, LabelDesign } from '@/lib/types';
+import { Download, Grid, Layout, Trash2, Save, FolderOpen, Upload } from 'lucide-react';
+import { PlacedLabelInstance, LabelDesign, PageLayoutDesign } from '@/lib/types';
 import { CANVAS_PRESETS } from '@/lib/layout/canvasPresets';
 import { calculateAutoLayout } from '@/lib/layout/pageLayout';
 import PageCanvas from '@/components/editor/PageCanvas';
 import LabelSelector from '@/components/editor/LabelSelector';
 import AppNavbar from '@/components/shared/AppNavbar';
+import PageLayoutListDialog from '@/components/editor/PageLayoutListDialog';
 import { exportCanvasAsImage, exportCanvasAsPDF, downloadFile } from '@/lib/export';
+import { savePageLayout, exportPageLayoutJSON, importPageLayoutJSON } from '@/lib/storage/page-layout-storage';
 
 /**
  * 整页排版页面
@@ -27,6 +29,21 @@ export default function PageLayoutPage() {
   const [showGrid, setShowGrid] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isLayoutListOpen, setIsLayoutListOpen] = useState(false);
+  const [currentLayoutId, setCurrentLayoutId] = useState<string>('');
+  
+  // Toast 提示状态
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [showToastState, setShowToastState] = useState(false);
+
+  // Toast 提示函数
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setShowToastState(true);
+    setTimeout(() => {
+      setShowToastState(false);
+    }, 3000);
+  };
 
   const canvasSize = {
     width: canvasPreset.width,
@@ -59,7 +76,7 @@ export default function PageLayoutPage() {
     
     // 重新计算所有标签的布局
     const newInstances = calculateAutoLayout(allLabels, canvasSize, {
-      spacing: 2, // 2mm 间距
+      spacing: 1, // 1mm 间距
       margins: {
         top: 5,
         right: 5,
@@ -104,10 +121,99 @@ export default function PageLayoutPage() {
 
   // 处理清除所有
   const handleClearAll = () => {
-    if (confirm('确定要清空画布上的所有标签吗？')) {
-      setInstances([]);
-      setSelectedInstance(undefined);
+    setInstances([]);
+    setSelectedInstance(undefined);
+    setCurrentLayoutId('');
+    showToast('已清空画布');
+  };
+
+  // 处理保存排版
+  const handleSaveLayout = async () => {
+    if (instances.length === 0) {
+      showToast('❌ 画布上没有标签，无法保存');
+      return;
     }
+
+    const layoutName = prompt('请输入排版名称:', currentLayoutId ? undefined : `排版_${new Date().toLocaleDateString()}`);
+    if (!layoutName) return;
+
+    const layout: PageLayoutDesign = {
+      layoutId: currentLayoutId || `layout_${Date.now()}`,
+      layoutName,
+      canvasPreset,
+      instances,
+      createdAt: currentLayoutId ? undefined as any : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const result = await savePageLayout(layout);
+    if (result.success) {
+      setCurrentLayoutId(layout.layoutId);
+      showToast('✅ 保存成功');
+    } else {
+      showToast(`❌ ${result.error}`);
+    }
+  };
+
+  // 处理加载排版
+  const handleLoadLayout = (layout: PageLayoutDesign) => {
+    setCanvasPreset(layout.canvasPreset);
+    setInstances(layout.instances);
+    setCurrentLayoutId(layout.layoutId);
+    setSelectedInstance(undefined);
+    showToast('✅ 加载成功');
+  };
+
+  // 处理导出JSON
+  const handleExportJSON = () => {
+    if (instances.length === 0) {
+      showToast('❌ 画布上没有标签，无法导出');
+      return;
+    }
+
+    const layout: PageLayoutDesign = {
+      layoutId: currentLayoutId || `layout_${Date.now()}`,
+      layoutName: currentLayoutId ? `排版_${Date.now()}` : `排版_${new Date().toLocaleDateString()}`,
+      canvasPreset,
+      instances,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      exportPageLayoutJSON(layout);
+      showToast('✅ JSON 导出成功');
+    } catch (error) {
+      showToast('❌ 导出失败');
+    }
+  };
+
+  // 处理导入JSON
+  const handleImportJSON = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const result = await importPageLayoutJSON(text);
+        
+        if (result.error) {
+          showToast(`❌ ${result.error}`);
+        } else if (result.layout) {
+          handleLoadLayout(result.layout);
+          showToast('✅ 导入成功并已保存到数据库');
+        }
+      } catch (error) {
+        showToast('❌ 导入失败');
+      }
+    };
+
+    input.click();
   };
 
   // 渲染单个标签到Canvas上下文
@@ -215,7 +321,7 @@ export default function PageLayoutPage() {
   // 处理导出
   const handleExport = async (format: 'png' | 'jpg' | 'pdf') => {
     if (instances.length === 0) {
-      alert('画布上还没有标签');
+      showToast('❌ 画布上还没有标签');
       return;
     }
 
@@ -261,10 +367,10 @@ export default function PageLayoutPage() {
         downloadFile(blob, `${filename}.${format}`);
       }
 
-      alert('导出成功！');
+      showToast('✅ 导出成功！');
     } catch (error) {
       console.error('导出失败:', error);
-      alert('导出失败，请重试');
+      showToast('❌ 导出失败，请重试');
     } finally {
       setIsExporting(false);
     }
@@ -316,18 +422,48 @@ export default function PageLayoutPage() {
           <Layout className="w-5 h-5" />
         </button>
 
+        <div className="h-6 w-px bg-gray-300"></div>
+
+        {/* 保存/加载按钮 */}
         <button
-          onClick={handleClearAll}
+          onClick={handleSaveLayout}
           disabled={instances.length === 0}
-          className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-          title="清空画布"
+          className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1"
+          title="保存排版"
         >
-          <Trash2 className="w-5 h-5" />
+          <Save className="w-5 h-5" />
+          <span className="text-sm">保存</span>
+        </button>
+
+        <button
+          onClick={() => setIsLayoutListOpen(true)}
+          className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-1"
+          title="加载排版"
+        >
+          <FolderOpen className="w-5 h-5" />
+          <span className="text-sm">加载</span>
+        </button>
+
+        <button
+          onClick={handleImportJSON}
+          className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+          title="导入JSON"
+        >
+          <Upload className="w-5 h-5" />
+        </button>
+
+        <button
+          onClick={handleExportJSON}
+          disabled={instances.length === 0}
+          className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+          title="导出JSON"
+        >
+          <Download className="w-4 h-4" />
         </button>
 
         <div className="h-6 w-px bg-gray-300"></div>
 
-        {/* 导出按钮 */}
+        {/* 导出图片/PDF按钮 */}
         <div className="relative">
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
@@ -375,7 +511,7 @@ export default function PageLayoutPage() {
       {/* 主要内容区域 */}
       <div className="flex flex-1 overflow-hidden">
         {/* 左侧画布区域 (70%) */}
-        <div className="flex-[7] flex flex-col min-w-0">
+        <div className="flex-[7] flex flex-col min-w-0 relative">
           <PageCanvas
             canvasSize={canvasSize}
             instances={instances}
@@ -385,6 +521,24 @@ export default function PageLayoutPage() {
             selectedInstance={selectedInstance}
             showGrid={showGrid}
           />
+          
+          {/* 状态栏 */}
+          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between px-4 py-2 bg-white rounded-lg shadow-md z-20">
+            <div className="text-sm text-gray-600">
+              画布: {canvasSize.width}×{canvasSize.height}mm | 标签数: {instances.length}
+            </div>
+            <button
+              onClick={handleClearAll}
+              disabled={instances.length === 0}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="清空画布"
+            >
+              清空排版
+            </button>
+            <div className="text-sm text-gray-600">
+              按住 Shift + 拖拽 平移画布
+            </div>
+          </div>
         </div>
 
         {/* 右侧标签管理面板 (30%) */}
@@ -392,6 +546,43 @@ export default function PageLayoutPage() {
           <LabelSelector onAddLabels={handleAddLabels} />
         </div>
       </div>
+
+      {/* 排版列表对话框 */}
+      <PageLayoutListDialog
+        isOpen={isLayoutListOpen}
+        onClose={() => setIsLayoutListOpen(false)}
+        onSelect={handleLoadLayout}
+      />
+
+      {/* Toast 提示 */}
+      {showToastState && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className={`rounded-lg shadow-2xl px-6 py-4 border-2 animate-[fadeIn_0.3s] ${
+            toastMessage.includes('✅') 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <p className={`text-sm font-semibold ${
+              toastMessage.includes('✅') ? 'text-green-800' : 'text-red-800'
+            }`}>
+              {toastMessage}
+            </p>
+          </div>
+        </div>
+      )}
+      
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

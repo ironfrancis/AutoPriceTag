@@ -108,7 +108,7 @@ export default function PlacedLabelItem({
       onClick={handleClick}
     >
       {/* 标签渲染区域 */}
-      <div className="absolute inset-0 bg-white border border-gray-200 rounded overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 bg-white border border-dashed border-gray-300 rounded overflow-hidden pointer-events-none" style={{ borderColor: 'rgba(0, 0, 0, 0.3)', borderWidth: '1px' }}>
         <LabelCanvas
           labelSize={instance.labelDesign.labelSize}
           productData={instance.labelDesign.productData}

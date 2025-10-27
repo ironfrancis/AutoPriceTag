@@ -301,17 +301,7 @@ export default function PageCanvas({
         </div>
       </div>
 
-      {/* 状态栏 */}
-      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between px-4 py-2 bg-white rounded-lg shadow-md z-20">
-        <div className="text-sm text-gray-600">
-          画布: {canvasSize.width}×{canvasSize.height}mm | 
-          缩放: {Math.round(zoom * 100)}% | 
-          标签数: {instances.length}
-        </div>
-        <div className="text-sm text-gray-600">
-          按住 Shift + 拖拽 平移画布
-        </div>
-      </div>
+      {/* 状态栏 - 不添加清空按钮，由父组件处理 */}
     </div>
   );
 }

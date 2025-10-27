@@ -300,3 +300,18 @@ export interface AutoLayoutOptions {
   };
   orientation?: 'horizontal' | 'vertical'; // 排列方向
 }
+
+/**
+ * 整页排版设计数据结构
+ * 
+ * 用于保存和加载整页排版的完整状态
+ * 包含画布尺寸、所有标签实例及其位置信息
+ */
+export interface PageLayoutDesign {
+  layoutId: string;              // 排版ID（唯一标识）
+  layoutName: string;            // 排版名称（用户自定义）
+  canvasPreset: CanvasPreset;    // 画布预设尺寸信息
+  instances: PlacedLabelInstance[]; // 所有已放置的标签实例
+  createdAt: string;             // 创建时间（ISO格式）
+  updatedAt: string;             // 更新时间（ISO格式）
+}
