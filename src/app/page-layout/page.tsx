@@ -110,6 +110,119 @@ export default function PageLayoutPage() {
     }
   };
 
+  // 渲染单个标签到Canvas上下文
+  const renderLabelToContext = (
+    ctx: CanvasRenderingContext2D,
+    instance: PlacedLabelInstance,
+    baseX: number,
+    baseY: number,
+    mmToPx: number,
+    scale: number
+  ) => {
+    const { labelDesign } = instance;
+    const { labelSize, productData } = labelDesign;
+    
+    // 标签尺寸（像素）
+    const labelWidth = labelSize.width * mmToPx * scale;
+    const labelHeight = labelSize.height * mmToPx * scale;
+    
+    // 保存上下文状态
+    ctx.save();
+    
+    // 移动到标签位置
+    ctx.translate(baseX, baseY);
+    
+    // 绘制标签背景和边框
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, labelWidth, labelHeight);
+    
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 1 * scale;
+    ctx.strokeRect(0, 0, labelWidth, labelHeight);
+    
+    // 计算字体大小和行高
+    const baseFontSize = 16 * scale;
+    const lineHeight = 1.4;
+    
+    // 设置默认样式
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#000000';
+    
+    let currentY = 8 * scale; // 内边距
+    
+    // 绘制商品名称
+    if (productData.name) {
+      ctx.font = `${baseFontSize * 1.2}px system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      const lines = productData.name.split('\n');
+      lines.forEach(line => {
+        if (line.trim()) {
+          ctx.fillText(line, 4 * scale, currentY);
+          currentY += baseFontSize * lineHeight;
+        }
+      });
+    }
+    
+    // 绘制品牌
+    if (productData.brand) {
+      currentY += 4 * scale;
+      ctx.font = `${baseFontSize * 0.8}px system-ui, sans-serif`;
+      ctx.fillStyle = '#6B7280';
+      ctx.fillText(productData.brand, 4 * scale, currentY);
+      currentY += baseFontSize * lineHeight;
+    }
+    
+    // 绘制价格
+    if (productData.price > 0) {
+      currentY += 6 * scale;
+      ctx.font = `bold ${baseFontSize * 1.5}px system-ui, sans-serif`;
+      ctx.fillStyle = '#2563eb';
+      ctx.textAlign = 'center';
+      ctx.fillText(`¥${productData.price.toFixed(2)}`, labelWidth / 2, currentY);
+      currentY += baseFontSize * lineHeight * 1.5;
+    }
+    
+    // 绘制卖点
+    if (productData.sellingPoints && productData.sellingPoints.length > 0) {
+      currentY += 6 * scale;
+      ctx.font = `${baseFontSize * 0.7}px system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#4B5563';
+      for (const point of productData.sellingPoints) {
+        if (point && point.trim()) {
+          ctx.fillText(`• ${point}`, 4 * scale, currentY);
+          currentY += baseFontSize * lineHeight * 0.8;
+          if (currentY > labelHeight - 10 * scale) break; // 防止超出
+        }
+      }
+    }
+    
+    // 绘制规格
+    if (productData.specs && Object.keys(productData.specs).length > 0) {
+      ctx.font = `${baseFontSize * 0.7}px system-ui, sans-serif`;
+      ctx.fillStyle = '#6B7280';
+      let specText = '';
+      for (const [key, value] of Object.entries(productData.specs)) {
+        if (value) specText += `${key}: ${value}; `;
+      }
+      if (specText && currentY < labelHeight - 20 * scale) {
+        // 处理文本换行
+        const words = specText.slice(0, -2).split('; ');
+        for (const word of words) {
+          if (currentY < labelHeight - 10 * scale) {
+            ctx.fillText(word, 4 * scale, currentY);
+            currentY += baseFontSize * lineHeight * 0.7;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+    
+    // 恢复上下文状态
+    ctx.restore();
+  };
+
   // 处理导出
   const handleExport = async (format: 'png' | 'jpg' | 'pdf') => {
     if (instances.length === 0) {
@@ -129,7 +242,7 @@ export default function PageLayoutPage() {
 
       // mm转像素 (1mm = 3.7795275591px at 96 DPI)
       const mmToPx = 3.7795275591;
-      const scale = 2; // 高分辨率
+      const scale = 2; // 高分辨率导出
       const width = canvasSize.width * mmToPx * scale;
       const height = canvasSize.height * mmToPx * scale;
 
@@ -140,22 +253,11 @@ export default function PageLayoutPage() {
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, width, height);
 
-      // 绘制所有标签
+      // 绘制所有标签（使用完整渲染）
       for (const instance of instances) {
-        const labelWidth = instance.labelDesign.labelSize.width * mmToPx * scale;
-        const labelHeight = instance.labelDesign.labelSize.height * mmToPx * scale;
         const x = instance.position.x * mmToPx * scale;
         const y = instance.position.y * mmToPx * scale;
-
-        // 绘制标签矩形
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, labelWidth, labelHeight);
-
-        // 这里应该绘制标签内容，简化处理
-        ctx.fillStyle = '#000000';
-        ctx.font = `${14 * scale}px Arial`;
-        ctx.fillText(instance.labelDesign.productData.name || 'Label', x + 5 * scale, y + 20 * scale);
+        renderLabelToContext(ctx, instance, x, y, mmToPx, scale);
       }
 
       // 导出
