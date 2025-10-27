@@ -4,7 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 检查是否配置了 Supabase
+const isSupabaseConfigured = supabaseUrl && supabaseAnonKey;
+
+// 只有在配置了 Supabase 的情况下才创建客户端
+export const supabase = isSupabaseConfigured 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 /**
  * Supabase 客户端

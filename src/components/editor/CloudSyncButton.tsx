@@ -54,8 +54,20 @@ export default function CloudSyncButton({ }: CloudSyncButtonProps) {
   const [position, setPosition] = useState('');
   const [workplaceSize, setWorkplaceSize] = useState('');
 
+  // 如果 Supabase 未配置，显示禁用状态
+  if (!supabase) {
+    return (
+      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
+        <CloudOff className="h-4 w-4 text-gray-400" />
+        <span className="text-sm font-medium text-gray-500">云同步未配置</span>
+      </div>
+    );
+  }
+
   // 检查登录状态
   useEffect(() => {
+    if (!supabase) return;
+    
     checkAuthStatus();
     
     // 监听认证状态变化
@@ -71,6 +83,7 @@ export default function CloudSyncButton({ }: CloudSyncButtonProps) {
   }, []);
 
   const checkAuthStatus = async () => {
+    if (!supabase) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -83,6 +96,8 @@ export default function CloudSyncButton({ }: CloudSyncButtonProps) {
   };
 
   const handleAuth = async () => {
+    if (!supabase) return;
+    
     if (!email || !password) {
       setMessage('请填写邮箱和密码');
       return;
@@ -153,6 +168,7 @@ export default function CloudSyncButton({ }: CloudSyncButtonProps) {
   };
 
   const handleLogout = async () => {
+    if (!supabase) return;
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setUser(null);

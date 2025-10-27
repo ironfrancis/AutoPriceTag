@@ -15,6 +15,10 @@ import { LabelDesign } from '@/lib/types';
  * 保存设计到云端
  */
 export const saveDesignToCloud = async (design: LabelDesign): Promise<{ success: boolean; error?: string }> => {
+  if (!supabase) {
+    return { success: false, error: 'Supabase 未配置，无法使用云存储' };
+  }
+
   try {
     // 检查是否已登录
     const { data: { user } } = await supabase.auth.getUser();
@@ -53,6 +57,10 @@ export const saveDesignToCloud = async (design: LabelDesign): Promise<{ success:
  * 从云端加载所有设计
  */
 export const loadDesignsFromCloud = async (): Promise<{ designs: LabelDesign[]; error?: string }> => {
+  if (!supabase) {
+    return { designs: [], error: 'Supabase 未配置，无法使用云存储' };
+  }
+
   try {
     // 检查是否已登录
     const { data: { user } } = await supabase.auth.getUser();
@@ -99,6 +107,10 @@ export const loadDesignsFromCloud = async (): Promise<{ designs: LabelDesign[]; 
  * 从云端删除设计
  */
 export const deleteDesignFromCloud = async (labelId: string): Promise<{ success: boolean; error?: string }> => {
+  if (!supabase) {
+    return { success: false, error: 'Supabase 未配置，无法使用云存储' };
+  }
+
   try {
     // 检查是否已登录
     const { data: { user } } = await supabase.auth.getUser();
