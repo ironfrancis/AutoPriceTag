@@ -45,7 +45,11 @@ export const savePageLayout = async (layout: PageLayoutDesign): Promise<{ succes
 
     if (error) {
       console.error('保存整页排版失败:', error);
-      return { success: false, error: error.message };
+      // 如果表不存在，提示用户
+      if (error.message?.includes('page_layouts') || error.code === '42P01') {
+        return { success: false, error: '数据库表不存在，请先运行迁移文件创建表' };
+      }
+      return { success: false, error: error.message || '保存失败' };
     }
 
     return { success: true };
@@ -79,7 +83,11 @@ export const loadPageLayouts = async (): Promise<{ layouts: PageLayoutDesign[]; 
 
     if (error) {
       console.error('加载整页排版失败:', error);
-      return { layouts: [], error: error.message };
+      // 如果表不存在，提示用户
+      if (error.message?.includes('page_layouts') || error.code === '42P01') {
+        return { layouts: [], error: '数据库表不存在，请先运行迁移文件创建表' };
+      }
+      return { layouts: [], error: error.message || '加载失败' };
     }
 
     // 解析数据
@@ -134,7 +142,10 @@ export const deletePageLayout = async (layoutId: string): Promise<{ success: boo
 
     if (error) {
       console.error('删除整页排版失败:', error);
-      return { success: false, error: error.message };
+      if (error.message?.includes('page_layouts') || error.code === '42P01') {
+        return { success: false, error: '数据库表不存在' };
+      }
+      return { success: false, error: error.message || '删除失败' };
     }
 
     return { success: true };
