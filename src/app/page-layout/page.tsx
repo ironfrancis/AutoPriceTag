@@ -349,11 +349,19 @@ export default function PageLayoutPage() {
       ctx.fillRect(0, 0, width, height);
 
       // 绘制所有标签（使用完整渲染）
+      console.log('开始导出，标签数量:', instances.length);
       for (const instance of instances) {
         const x = instance.position.x * mmToPx * scale;
         const y = instance.position.y * mmToPx * scale;
+        console.log('渲染标签:', {
+          id: instance.id,
+          position: instance.position,
+          renderAt: { x, y },
+          labelSize: instance.labelDesign.labelSize
+        });
         renderLabelToContext(ctx, instance, x, y, mmToPx, scale);
       }
+      console.log('导出完成');
 
       // 导出
       let blob: Blob;
