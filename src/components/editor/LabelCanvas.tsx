@@ -11,9 +11,13 @@ interface LabelCanvasProps {
   labelSize: { width: number; height: number };
   productData: ProductData;
   fontConfigs?: Record<string, FontConfig>;
+  elementStyles?: Record<string, any>; // 元素样式配置（增强版）
+  savedLayout?: { elements: Array<{ id: string; x: number; y: number; text: string; visible?: boolean }> }; // 保存的布局
   onCanvasReady?: (canvas: any) => void;
   className?: string;
   isExporting?: boolean; // 添加导出状态
+  showMetadata?: boolean; // 是否显示底部元信息（尺寸、元素数量、缩放等）
+  disableInternalScaling?: boolean; // 是否禁用内部缩放（用于整页排版）
   // 模板系统支持
   templateId?: string; // 模板ID
   templateConfig?: TemplateConfig; // 直接传入模板配置
@@ -25,9 +29,13 @@ export default function LabelCanvas({
   labelSize, 
   productData, 
   fontConfigs,
+  elementStyles,
+  savedLayout,
   onCanvasReady,
   className = '',
   isExporting = false,
+  showMetadata = true, // 默认显示元信息
+  disableInternalScaling = false, // 默认不禁用内部缩放
   templateId,
   templateConfig,
   textAreaRatio = 0.65,
@@ -107,7 +115,13 @@ export default function LabelCanvas({
     if (!ctx) return;
 
     // 计算限制后的显示尺寸
-    const limitedSize = calculateLimitedDisplaySize(labelSize.width, labelSize.height);
+    const limitedSize = disableInternalScaling 
+      ? { 
+          width: mmToPixels(labelSize.width),
+          height: mmToPixels(labelSize.height),
+          scale: 1 
+        }
+      : calculateLimitedDisplaySize(labelSize.width, labelSize.height);
     
     const renderScale = 2;
     const canvasWidth = limitedSize.width * renderScale;
@@ -116,7 +130,7 @@ export default function LabelCanvas({
     // 只在尺寸真正变化时才更新画布尺寸
     const needsResize = canvas.width !== canvasWidth || canvas.height !== canvasHeight;
     
-    if (needsResize) {
+      if (needsResize) {
       console.log('Canvas size changed, resizing:', {
         oldSize: { width: canvas.width, height: canvas.height },
         newSize: { width: canvasWidth, height: canvasHeight }
@@ -125,7 +139,10 @@ export default function LabelCanvas({
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
       
-      // 设置显示尺寸（限制后的尺寸）
+      // 设置显示尺寸
+      // canvas 的实际像素是 limitedSize * renderScale
+      // 但显示尺寸是 limitedSize（即实际像素 / renderScale）
+      // 这样可以让 canvas 以 retina 清晰度显示
       canvas.style.width = `${limitedSize.width}px`;
       canvas.style.height = `${limitedSize.height}px`;
 
@@ -137,28 +154,68 @@ export default function LabelCanvas({
       let simpleResult: SimpleLayoutResult;
       let finalFontConfigs = fontConfigs;
 
-      // 检查是否使用模板
-      let activeTemplate: TemplateConfig | undefined;
-      if (templateConfig) {
-        activeTemplate = templateConfig;
-      } else if (templateId) {
-        activeTemplate = getTemplateConfigById(templateId);
-      }
+      // 如果有保存的布局，使用保存的布局
+      if (savedLayout && savedLayout.elements.length > 0) {
+        // 计算实际的显示尺寸（考虑可能有的缩放）
+        // limitedSize 是在前面计算的，包含了 scale 信息
+        const displayWidth = limitedSize.width;
+        const displayHeight = limitedSize.height;
 
-      // 如果使用模板，使用模板渲染器
-      if (activeTemplate) {
-        const renderer = new TemplateRenderer(activeTemplate, labelSize, productData, fontConfigs);
-        simpleResult = renderer.render();
-        finalFontConfigs = renderer.getMergedFontConfigs();
+        // 将百分比位置转换为显示尺寸的像素位置
+        // 重要：保存的位置是文本左边界的百分比（对于所有对齐方式）
+        simpleResult = {
+          elements: savedLayout.elements
+            .filter(el => el.visible !== false) // 过滤不可见元素
+            .map(el => {
+              // 从 fontConfigs 或 elementStyles 获取字体配置
+              const fontConfig = (elementStyles || fontConfigs)?.[el.id];
+              const align = (fontConfig?.textAlign || 'left') as 'left' | 'center' | 'right';
+              
+              // 计算文本左边界的位置（像素）
+              // 保存的百分比位置（0-100）表示文本左边界的百分比位置
+              const baseX = (el.x / 100) * displayWidth;
+              const baseY = (el.y / 100) * displayHeight;
+              
+              return {
+                id: el.id,
+                x: baseX, // 文本左边界位置（所有对齐方式都相同）
+                y: baseY, // 文本顶部位置
+                width: displayWidth, // 宽度使用显示宽度
+                height: fontConfig?.lineHeight ? fontConfig.fontSize * fontConfig.lineHeight : 50,
+                fontSize: fontConfig?.fontSize || 16, // 从 fontConfigs 获取
+                align, // 对齐方式将在渲染时处理
+                lines: 1,
+                text: el.text,
+                priority: 1
+              };
+            }),
+          totalWidth: displayWidth,
+          totalHeight: displayHeight
+        };
       } else {
-        // 否则使用简单布局
-        simpleResult = calculateSimpleLayout(
-          labelSize.width,
-          labelSize.height,
-          productData,
-          undefined,
-          textAreaRatio
-        );
+        // 检查是否使用模板
+        let activeTemplate: TemplateConfig | undefined;
+        if (templateConfig) {
+          activeTemplate = templateConfig;
+        } else if (templateId) {
+          activeTemplate = getTemplateConfigById(templateId);
+        }
+
+        // 如果使用模板，使用模板渲染器
+        if (activeTemplate) {
+          const renderer = new TemplateRenderer(activeTemplate, labelSize, productData, fontConfigs);
+          simpleResult = renderer.render();
+          finalFontConfigs = renderer.getMergedFontConfigs();
+        } else {
+          // 否则使用简单布局
+          simpleResult = calculateSimpleLayout(
+            labelSize.width,
+            labelSize.height,
+            productData,
+            undefined,
+            textAreaRatio
+          );
+        }
       }
 
       setSimpleLayoutResult(simpleResult);
@@ -169,15 +226,23 @@ export default function LabelCanvas({
       }
 
       // 直接渲染到画布，不显示加载动画（避免闪烁）
-      renderSimpleLayoutToCanvas(simpleResult, labelSize, finalFontConfigs);
+      // 优先使用 elementStyles，否则使用 finalFontConfigs
+      const styles = elementStyles || finalFontConfigs;
+      renderSimpleLayoutToCanvas(simpleResult, labelSize, styles, disableInternalScaling);
       
     } catch (error) {
       console.error('Layout calculation or rendering failed:', error);
     }
-  }, [labelSize, productData, fontConfigs, textAreaRatio, templateId, templateConfig, onLayoutChange])
+  }, [labelSize, productData, fontConfigs, elementStyles, savedLayout, textAreaRatio, templateId, templateConfig, onLayoutChange, disableInternalScaling])
 
   // 监听容器尺寸变化，计算缩放比例
   useEffect(() => {
+    // 如果禁用内部缩放，则跳过缩放计算
+    if (disableInternalScaling) {
+      setScale(1);
+      return;
+    }
+
     const container = containerRef.current;
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
@@ -231,7 +296,7 @@ export default function LabelCanvas({
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateScale);
     };
-  }, [labelSize]); // 添加labelSize依赖，当标签尺寸变化时重新计算
+  }, [labelSize, disableInternalScaling]); // 添加labelSize依赖，当标签尺寸变化时重新计算
 
   // 计算基于宽高比的固定预览尺寸
   const calculatePreviewSizeByRatio = (
@@ -330,21 +395,29 @@ export default function LabelCanvas({
   };
 
   // 简洁渲染到画布
-  const renderSimpleLayoutToCanvas = (simpleResult: SimpleLayoutResult, size: { width: number; height: number }, fontConfigs?: Record<string, FontConfig>) => {
+  const renderSimpleLayoutToCanvas = (simpleResult: SimpleLayoutResult, size: { width: number; height: number }, fontConfigs?: Record<string, FontConfig>, disableScaling = false) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 计算限制后的显示尺寸
-    const limitedSize = calculateLimitedDisplaySize(size.width, size.height);
+    const renderScale = 2; // 高DPI渲染比例
+
+    // 根据是否禁用内部缩放决定使用的尺寸
+    const limitedSize = disableScaling
+      ? { 
+          width: mmToPixels(size.width),
+          height: mmToPixels(size.height),
+          scale: 1 
+        }
+      : calculateLimitedDisplaySize(size.width, size.height);
     
     // 获取真实像素尺寸（用于计算布局）
     const realWidthPx = mmToPixels(size.width);
     const realHeightPx = mmToPixels(size.height);
     
-    // 但是用限制后的尺寸来绘制Canvas
+    // 用limitedSize来绘制Canvas
     const canvasSize = { width: limitedSize.width, height: limitedSize.height };
 
     console.log('Rendering to canvas:', {
@@ -353,7 +426,8 @@ export default function LabelCanvas({
       labelSize: size,
       realSizePx: { width: realWidthPx, height: realHeightPx },
       limitedSize: canvasSize,
-      scaleFactor: limitedSize.scale,
+      renderScale,
+      disableScaling,
       elementsCount: simpleResult.elements.length,
       elements: simpleResult.elements
     });
@@ -367,6 +441,12 @@ export default function LabelCanvas({
     // 不再绘制分割线（已改为统一垂直布局）
 
     // 渲染每个简洁元素（需要考虑Canvas的缩放比例）
+    // ctx 已经被 ctx.scale(renderScale, renderScale) 缩放过了
+    // 所以在绘制时，坐标应该直接使用像素值，不需要再乘以 renderScale
+    // 但是需要注意：当 disableScaling=true 时，canvas 会被拉伸
+    // 所以我们需要考虑外层容器的缩放比
+    const scaleFactor = 1; // 因为 ctx 已经 scale 过了，所以不需要再缩放
+    
     simpleResult.elements.forEach((element, index) => {
       console.log(`Rendering element ${index}:`, {
         id: element.id,
@@ -375,9 +455,9 @@ export default function LabelCanvas({
         position: { x: element.x, y: element.y },
         canvasSize,
         labelSizeMm: size,
-        scaleFactor: limitedSize.scale
+        scaleFactor
       });
-      renderSimpleElementForPreview(ctx, element, canvasSize, size, fontConfigs, limitedSize.scale);
+      renderSimpleElementForPreview(ctx, element, canvasSize, size, fontConfigs, scaleFactor);
     });
   };
 
@@ -389,7 +469,7 @@ export default function LabelCanvas({
     element: any, // SimpleLayoutElement
     canvasSize: { width: number; height: number },
     labelSizeMm: { width: number; height: number },
-    fontConfigs?: Record<string, FontConfig>,
+    styles?: Record<string, any>, // 支持 FontConfig 或 ElementStyleConfig
     scaleFactor: number = 1 // Canvas的缩放比例
   ) => {
     if (!element.text) {
@@ -409,8 +489,8 @@ export default function LabelCanvas({
     // 需要考虑Canvas的缩放比例
     const scale = scaleFactor; // Canvas的缩放比例
 
-    // 获取字体配置
-    const fontConfig = fontConfigs?.[element.id] || {
+    // 获取字体配置（支持 FontConfig 和 ElementStyleConfig）
+    const styleConfig = styles?.[element.id] || {
       fontSize: element.fontSize,
       fontWeight: 400,
       fontStyle: 'normal',
@@ -419,16 +499,49 @@ export default function LabelCanvas({
       fontFamily: 'system-ui, -apple-system, sans-serif'
     };
 
+    // 如果有扩展样式配置，绘制背景和边框
+    if (styleConfig.backgroundColor || styleConfig.borderWidth) {
+      const padding = (styleConfig.padding || 0) * scale;
+      const x = element.x * scale - padding;
+      const y = element.y * scale - padding;
+      const width = element.width * scale + padding * 2;
+      const height = element.height * scale + padding * 2;
+
+      // 绘制背景
+      if (styleConfig.backgroundColor) {
+        ctx.fillStyle = styleConfig.backgroundColor;
+        ctx.globalAlpha = styleConfig.opacity !== undefined ? styleConfig.opacity : 1;
+        ctx.fillRect(x, y, width, height);
+      }
+
+      // 绘制边框
+      if (styleConfig.borderWidth && styleConfig.borderWidth > 0) {
+        const borderWidth = styleConfig.borderWidth * scale;
+        ctx.strokeStyle = styleConfig.borderColor || '#000000';
+        ctx.lineWidth = borderWidth;
+        ctx.strokeRect(x, y, width, height);
+      }
+
+      // 重置透明度
+      ctx.globalAlpha = 1;
+    }
+
     // 设置字体（考虑Canvas缩放）
-    const scaledFontSize = fontConfig.fontSize * scale;
-    const fontWeight = fontConfig.fontWeight;
-    const fontStyle = fontConfig.fontStyle;
-    const fontFamily = fontConfig.fontFamily;
+    const scaledFontSize = styleConfig.fontSize * scale;
+    const fontWeight = styleConfig.fontWeight;
+    const fontStyle = styleConfig.fontStyle;
+    const fontFamily = styleConfig.fontFamily;
+    const lineHeight = styleConfig.lineHeight || 1.4;
     
     ctx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px ${fontFamily}`;
-    ctx.fillStyle = fontConfig.color;
-    ctx.textAlign = fontConfig.textAlign as CanvasTextAlign;
+    ctx.fillStyle = styleConfig.color;
+    ctx.textAlign = styleConfig.textAlign as CanvasTextAlign;
     ctx.textBaseline = 'top';
+
+    // 字间距
+    if (styleConfig.letterSpacing) {
+      ctx.letterSpacing = `${styleConfig.letterSpacing * scale}px`;
+    }
 
     console.log(`Font settings:`, {
       font: ctx.font,
@@ -438,41 +551,56 @@ export default function LabelCanvas({
 
     // 处理多行文本
     const lines = element.text.split('\n');
-    const lineHeight = scaledFontSize * 1.4; // 使用更大的行高
+    const calculatedLineHeight = scaledFontSize * lineHeight;
+
+    // 计算内边距偏移
+    const padding = (styleConfig.padding || 0) * scale;
+    const textOffsetX = padding;
+    const textOffsetY = padding;
 
     lines.forEach((line: string, index: number) => {
-      // 按比例调整位置
-      const scaledX = element.x * scale;
-      const scaledY = element.y * scale + index * lineHeight;
+      // 基础位置（顶部Y坐标）
+      const baseY = element.y + index * calculatedLineHeight;
+      
+      // 测量文本宽度
+      const textWidth = ctx.measureText(line).width;
       
       // 处理文本对齐
-      let x = scaledX;
+      // 关键：element.x 是文本左边界位置（来自 DraggableLabelCanvas）
+      // 绘制时需要根据对齐方式计算实际的 drawX
+      let drawX = element.x;
+      
       if (element.align === 'center') {
-        const textWidth = ctx.measureText(line).width;
-        x = scaledX + (element.width * scale - textWidth) / 2;
+        // 居中对齐：drawX = 左边界 + 一半文本宽度（与 DraggableLabelCanvas 一致）
+        drawX = element.x + textWidth / 2;
       } else if (element.align === 'right') {
-        const textWidth = ctx.measureText(line).width;
-        x = scaledX + element.width * scale - textWidth;
+        // 右对齐：drawX = 左边界 + 文本宽度
+        drawX = element.x + textWidth;
       }
+      // left 对齐：drawX = 左边界（直接使用 element.x）
+      
+      const scaledX = drawX;
+      const scaledY = baseY;
 
       // 确保文本在Canvas区域内
-      const textWidth = ctx.measureText(line).width;
+      // 对于居中和右对齐，文本可能会超出边界，但仍然应该绘制
+      const isVisible = scaledY >= 0 && scaledY + scaledFontSize <= canvasSize.height;
+      
       console.log(`Drawing line ${index}:`, {
         line,
-        position: { x, y: scaledY },
+        position: { x: drawX, y: scaledY },
         textWidth,
         scaledFontSize,
         canvasSize,
-        inBounds: x >= 0 && x + textWidth <= canvasSize.width && 
-                  scaledY >= 0 && scaledY + scaledFontSize <= canvasSize.height
+        isVisible
       });
       
-      if (x >= 0 && x + textWidth <= canvasSize.width && 
-          scaledY >= 0 && scaledY + scaledFontSize <= canvasSize.height) {
-        ctx.fillText(line, x, scaledY);
+      // 只要 Y 坐标在可见区域内就绘制（X 坐标可能超出，特别是居中和右对齐）
+      if (isVisible) {
+        ctx.fillText(line, drawX, scaledY);
         console.log(`Text drawn successfully`);
       } else {
-        console.log(`Text out of bounds, not drawn`);
+        console.log(`Text out of bounds (Y: ${scaledY}, height: ${canvasSize.height}), not drawn`);
       }
     });
   };
@@ -491,62 +619,79 @@ export default function LabelCanvas({
         </div>
       )}
       
-      <div className="h-full flex flex-col" style={{ position: 'relative', width: '100%', height: '100%', paddingBottom: '32px' }}>
-        <div className="flex-1 flex items-center justify-center min-h-0 mb-1">
-          {labelSize.width > 0 && labelSize.height > 0 ? (
-            <div 
-              className="relative"
-              style={{
-                transform: `scale(${scale})`,
-                transformOrigin: 'center'
-              }}
-            >
-              <canvas
-                ref={canvasRef}
-                className="border-0 rounded-lg shadow-lg bg-white"
-                style={{ 
-                  width: 'auto', 
-                  height: 'auto',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+      {disableInternalScaling ? (
+        // 整页排版模式：直接渲染，不使用内部缩放
+        <div style={{ width: '100%', height: '100%' }}>
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full"
+            style={{ 
+              display: 'block',
+              border: 'none'
+            }}
+          />
+        </div>
+      ) : (
+        // 单页编辑模式：使用内部缩放适配容器
+        <div className="h-full flex flex-col" style={{ position: 'relative', width: '100%', height: '100%', paddingBottom: showMetadata ? '32px' : '0' }}>
+          <div className="flex-1 flex items-center justify-center min-h-0 mb-1">
+            {labelSize.width > 0 && labelSize.height > 0 ? (
+              <div 
+                className="relative"
+                style={{
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'center'
                 }}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              <div className="text-center">
-                <div className="text-subheading text-gray-600 mb-2">请设置标签尺寸</div>
-                <div className="text-caption text-gray-500">在下方输入宽度和高度来开始设计</div>
+              >
+                <canvas
+                  ref={canvasRef}
+                  className="border-0 rounded-lg shadow-lg bg-white"
+                  style={{ 
+                    width: 'auto', 
+                    height: 'auto',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <div className="text-subheading text-gray-600 mb-2">请设置标签尺寸</div>
+                  <div className="text-caption text-gray-500">在下方输入宽度和高度来开始设计</div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* 底部信息栏 - 单行显示所有信息 */}
+          {showMetadata && (
+            <div className="absolute bottom-0 left-0 right-0 px-3 pb-2">
+              <div className="flex items-center justify-center gap-x-3 text-xs bg-white rounded px-3 py-1">
+                {/* 标签尺寸 */}
+                <span className="font-medium text-gray-700">
+                  {labelSize.width > 0 && labelSize.height > 0 ? `${labelSize.width}×${labelSize.height}mm` : '未设置尺寸'}
+                </span>
+                
+                {/* 布局信息 */}
+                {simpleLayoutResult && (
+                  <>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-purple-600">
+                      {simpleLayoutResult.elements.length}个元素
+                    </span>
+                  </>
+                )}
+                
+                {/* 缩放信息 */}
+                <span className="text-gray-400">•</span>
+                <span className="text-orange-600">
+                  缩放 {Math.round(scale * 100)}%
+                </span>
               </div>
             </div>
           )}
         </div>
-        
-        {/* 底部信息栏 - 单行显示所有信息 */}
-        <div className="absolute bottom-0 left-0 right-0 px-3 pb-2">
-          <div className="flex items-center justify-center gap-x-3 text-xs bg-white rounded px-3 py-1">
-            {/* 标签尺寸 */}
-            <span className="font-medium text-gray-700">
-              {labelSize.width > 0 && labelSize.height > 0 ? `${labelSize.width}×${labelSize.height}mm` : '未设置尺寸'}
-            </span>
-            
-            {/* 布局信息 */}
-            {simpleLayoutResult && (
-              <>
-                <span className="text-gray-400">•</span>
-                <span className="text-purple-600">
-                  {simpleLayoutResult.elements.length}个元素
-                </span>
-              </>
-            )}
-            
-            {/* 缩放信息 */}
-            <span className="text-gray-400">•</span>
-            <span className="text-orange-600">
-              缩放 {Math.round(scale * 100)}%
-            </span>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

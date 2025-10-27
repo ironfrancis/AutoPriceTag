@@ -233,3 +233,70 @@ export interface PlacedLabel {
   labelId: string;
   position: { x: number; y: number };
 }
+
+/**
+ * 整页排版相关类型定义
+ */
+
+/**
+ * 画布预设尺寸
+ */
+export interface CanvasPreset {
+  id: string;
+  name: string;
+  width: number;  // 宽度（mm）
+  height: number; // 高度（mm）
+  description?: string;
+}
+
+/**
+ * 已放置的标签实例
+ * 表示画布上的一个标签实体，包含其在整页画布上的位置和引用
+ */
+export interface PlacedLabelInstance {
+  id: string;              // 实例ID
+  labelDesign: LabelDesign; // 引用的标签设计
+  position: {               // 在整页画布上的位置（mm）
+    x: number;
+    y: number;
+  };
+  scale?: number;           // 缩放比例（0-1，用于缩略显示）
+  isSelected?: boolean;     // 是否被选中
+  rotate?: number;          // 旋转角度（度）
+}
+
+/**
+ * 整页布局配置
+ */
+export interface PageLayout {
+  canvasSize: {             // 画布尺寸（mm）
+    width: number;
+    height: number;
+  };
+  instances: PlacedLabelInstance[]; // 所有已放置的标签实例
+  grid?: {                  // 网格配置（可选）
+    enabled: boolean;
+    size: number;          // 网格大小（mm）
+    color: string;
+  };
+  margins?: {               // 边距配置（mm）
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+}
+
+/**
+ * 自动布局选项
+ */
+export interface AutoLayoutOptions {
+  spacing?: number;         // 标签间距（mm，默认2）
+  margins?: {              // 画布边距（mm，默认5）
+    top?: number;
+    right?: number;
+    bottom?: number;
+    left?: number;
+  };
+  orientation?: 'horizontal' | 'vertical'; // 排列方向
+}

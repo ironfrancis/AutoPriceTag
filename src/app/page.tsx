@@ -19,6 +19,9 @@ export default function Home() {
               <Link href="/draggable-editor" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
                 标签编辑器
               </Link>
+              <Link href="/page-layout" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
+                整页排版
+              </Link>
               <Link href="/cases" className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">
                 案例展示
               </Link>
@@ -123,6 +126,20 @@ export default function Home() {
                 智能计算最优布局，支持批量操作，大幅提升工作效率
               </p>
             </div>
+
+            {/* 整页排版 - 新功能 */}
+            <Link href="/page-layout" className="card p-8 text-center hover:shadow-lg transition-all group">
+              <div className="mx-auto h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                <svg className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900">整页排版</h3>
+              <p className="mt-2 text-gray-600">
+                将多个标签混合排列到A4等标准纸张，一键导出打印
+              </p>
+              <span className="mt-2 inline-block text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✨ 新功能</span>
+            </Link>
           </div>
         </div>
       </section>

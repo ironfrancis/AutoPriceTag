@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Save, Download, HelpCircle, ArrowLeft, FolderOpen } from 'lucide-react';
+import { Save, Download, HelpCircle, FolderOpen } from 'lucide-react';
 import { ProductData } from '@/lib/types';
 import { ExportManager } from '@/lib/export';
 import { saveLabel } from '@/lib/db';
@@ -11,6 +11,7 @@ import ProductForm from '@/components/editor/ProductForm';
 import SizeInput from '@/components/editor/SizeInput';
 import SavedLabelsDialog from '@/components/editor/SavedLabelsDialog';
 import FontCustomizer, { FontConfig } from '@/components/editor/FontCustomizer';
+import AppNavbar from '@/components/shared/AppNavbar';
 
 export default function EditorPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -260,120 +261,101 @@ export default function EditorPage() {
   return (
     <div className="h-screen bg-stone-50 flex flex-col overflow-hidden">
       {/* 顶部导航栏 - 固定高度 */}
-      <nav className="bg-stone-100 border-b border-stone-200 shadow-sm flex-shrink-0">
-        <div className="px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/"
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="text-sm font-medium">返回首页</span>
-              </Link>
-              <div className="h-6 w-px bg-stone-300"></div>
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-orange-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">APT</span>
-                </div>
-                <span className="text-heading text-gray-900">智能标签编辑器</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              {/* 预设尺寸选择器 */}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-600">预设尺寸:</span>
-                <select
-                  value={`${labelSize.width}x${labelSize.height}`}
-                  onChange={(e) => {
-                    const [width, height] = e.target.value.split('x').map(Number);
-                    handleSizeChange({ width, height });
-                  }}
-                  className="text-sm font-medium border border-stone-300 rounded px-2 py-1 bg-white text-gray-700"
-                >
-                  <option value="50x30">小标签 (50×30)</option>
-                  <option value="80x50">标准标签 (80×50)</option>
-                  <option value="100x60">大标签 (100×60)</option>
-                  <option value="120x40">横版标签 (120×40)</option>
-                  <option value="60x100">竖版标签 (60×100)</option>
-                  <option value="80x80">方形标签 (80×80)</option>
-                </select>
-              </div>
-              
-              <div className="h-6 w-px bg-stone-300"></div>
-              
-              <button 
-                onClick={() => setShowSavedLabels(true)}
-                className="btn btn-outline px-4 py-2 text-sm font-medium"
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                我的标签
-              </button>
-              
-              <button 
-                onClick={handleSave}
-                disabled={isSaving}
-                className="btn btn-primary px-4 py-2 text-sm font-medium disabled:opacity-50"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {isSaving ? '保存中...' : '保存标签'}
-              </button>
-              
-              <div className="relative export-menu-container">
-                <button 
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  disabled={isExporting}
-                  className="btn btn-outline px-4 py-2 text-sm font-medium disabled:opacity-50"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {isExporting ? '导出中...' : '导出'}
-                </button>
-                <div className={`absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${showExportMenu ? 'block' : 'hidden'}`}>
-                  <button
-                    onClick={() => {
-                      handleExport('png');
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg"
-                  >
-                    PNG 图片
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleExport('jpg');
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    JPG 图片
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleExport('pdf');
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg"
-                  >
-                    PDF 文档
-                  </button>
-                </div>
-              </div>
-              
-              <button className="btn btn-outline px-4 py-2 text-sm font-medium">
-                <HelpCircle className="h-4 w-4 mr-2" />
-                帮助
-              </button>
-              
-              {saveMessage && (
-                <div className="text-sm text-green-600 font-medium">
-                  {saveMessage}
-                </div>
-              )}
-            </div>
+      <AppNavbar 
+        title="智能标签编辑器"
+        backHref="/"
+        backLabel="返回首页"
+      >
+        {/* 预设尺寸选择器 */}
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium text-gray-600">预设尺寸:</span>
+          <select
+            value={`${labelSize.width}x${labelSize.height}`}
+            onChange={(e) => {
+              const [width, height] = e.target.value.split('x').map(Number);
+              handleSizeChange({ width, height });
+            }}
+            className="text-sm font-medium border border-stone-300 rounded px-2 py-1 bg-white text-gray-700"
+          >
+            <option value="50x30">小标签 (50×30)</option>
+            <option value="80x50">标准标签 (80×50)</option>
+            <option value="100x60">大标签 (100×60)</option>
+            <option value="120x40">横版标签 (120×40)</option>
+            <option value="60x100">竖版标签 (60×100)</option>
+            <option value="80x80">方形标签 (80×80)</option>
+          </select>
+        </div>
+        
+        <div className="h-6 w-px bg-stone-300"></div>
+        
+        <button 
+          onClick={() => setShowSavedLabels(true)}
+          className="btn btn-outline px-4 py-2 text-sm font-medium"
+        >
+          <FolderOpen className="h-4 w-4 mr-2" />
+          我的标签
+        </button>
+        
+        <button 
+          onClick={handleSave}
+          disabled={isSaving}
+          className="btn btn-primary px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          <Save className="h-4 w-4 mr-2" />
+          {isSaving ? '保存中...' : '保存标签'}
+        </button>
+        
+        <div className="relative export-menu-container">
+          <button 
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            disabled={isExporting}
+            className="btn btn-outline px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? '导出中...' : '导出'}
+          </button>
+          <div className={`absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${showExportMenu ? 'block' : 'hidden'}`}>
+            <button
+              onClick={() => {
+                handleExport('png');
+                setShowExportMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg"
+            >
+              PNG 图片
+            </button>
+            <button
+              onClick={() => {
+                handleExport('jpg');
+                setShowExportMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+            >
+              JPG 图片
+            </button>
+            <button
+              onClick={() => {
+                handleExport('pdf');
+                setShowExportMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg"
+            >
+              PDF 文档
+            </button>
           </div>
         </div>
-      </nav>
+        
+        <button className="btn btn-outline px-4 py-2 text-sm font-medium">
+          <HelpCircle className="h-4 w-4 mr-2" />
+          帮助
+        </button>
+        
+        {saveMessage && (
+          <div className="text-sm text-green-600 font-medium">
+            {saveMessage}
+          </div>
+        )}
+      </AppNavbar>
 
       {/* 主要内容区域 - 占据剩余空间 */}
       <div className="flex flex-1 overflow-hidden">

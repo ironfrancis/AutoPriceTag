@@ -1,5 +1,7 @@
 # Supabase 数据库配置指南
 
+> **重要提示（国内用户）**：如果您在国内网络环境下使用，建议先阅读 [邮箱确认配置指南](../docs/SUPABASE_EMAIL_CONFIG.md)，禁用邮箱确认功能以避免用户无法完成注册。
+
 ## 快速开始
 
 ### 1. 创建数据表
@@ -90,8 +92,24 @@ npm run dev
 - 检查 `.env.local` 文件是否在项目根目录
 - 检查变量名是否以 `NEXT_PUBLIC_` 开头
 
+## 重要配置（国内用户）
+
+### 禁用邮箱确认
+
+在国内网络环境下，Supabase 的邮箱确认功能可能无法正常工作。建议禁用以提升用户体验：
+
+**步骤：**
+1. 登录 [Supabase Dashboard](https://app.supabase.com)
+2. 选择你的项目
+3. 进入 **Authentication** → **Settings**
+4. 找到 **"Enable email confirmations"** 选项
+5. **取消勾选**并保存
+
+详细说明请查看：[邮箱确认配置指南](../docs/SUPABASE_EMAIL_CONFIG.md)
+
 ## 更多信息
 
 - [Supabase 文档](https://supabase.com/docs)
 - [Next.js 环境变量](https://nextjs.org/docs/basic-features/environment-variables)
+- [邮箱确认配置指南](../docs/SUPABASE_EMAIL_CONFIG.md) - 针对国内用户的优化配置
 
