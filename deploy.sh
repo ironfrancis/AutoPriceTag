@@ -49,8 +49,13 @@ else
 fi
 
 echo ""
-echo "5. 安装依赖..."
-npm install --production=false
+echo "5. 清理旧的依赖并重新安装..."
+# 清理缓存和旧的依赖
+rm -rf node_modules package-lock.json
+npm cache clean --force
+
+echo "正在安装所有依赖（包括开发依赖，这可能需要几分钟）..."
+npm install
 
 echo ""
 echo "6. 配置环境变量..."
@@ -79,8 +84,16 @@ EOF
 fi
 
 echo ""
-echo "7. 构建项目..."
+echo "7. 构建项目（这可能需要几分钟）..."
 npm run build
+
+# 检查构建是否成功
+if [ $? -eq 0 ]; then
+    echo "✓ 构建成功"
+else
+    echo "✗ 构建失败，请检查错误信息"
+    exit 1
+fi
 
 echo ""
 echo "8. 启动/重启应用..."
